@@ -1,10 +1,11 @@
-# 10/22/2024 - Javier Gonzalez-Castillo
+# 12/12/2024 - Javier Gonzalez-Castillo
 #
-# This script will generate MEICA denoised versions of the data with
-# the three different censoring schemes provided by 3dTproject
+# This script will generate Basic denoised version of the data
+# following optimal combination
 #
 
 export OMP_NUM_THREADS=32
+export AFNI_COMPRESSOR=GZIP
 set -e
 
 PRJDIR='/data/SFIMJGC_HCP7T/BCBL2024/'
@@ -67,6 +68,9 @@ echo " + Extracting ROI Timeseries and connectivity for [${INTERP_MODE}]"
                      errts.${SBJ}.r01.OC_MEICA.tproject_${INTERP_MODE}+tlrc > errts.${SBJ}.r01.OC_MEICA.tproject_${INTERP_MODE}.${ATLAS_NAME}_000.netts
 done
 
+# Once we extract ROI timeseries and FC matrices, it is very unlike that we will need the data in this form --> to save space --> remove
+rm errts.${SBJ}.r01.OC_MEICA.tproject_NTRP+tlrc.*
+rm errts.${SBJ}.r01.OC_MEICA.tproject_ZERO+tlrc.*
 
 echo "==============================="
 echo "++ Script Finished successfully"

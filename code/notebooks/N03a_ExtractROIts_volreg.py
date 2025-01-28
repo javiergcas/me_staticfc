@@ -74,6 +74,12 @@ for sbj,ses in list(dataset_info_df.index):
     netcc_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.e02.volreg.scale.tproject_ALL.{ATLAS_NAME}_000.netcc')
     if not osp.exists(netcc_path):
         print('++ WARNING: %s is missing'% netcc_path)
+    netcc_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.e02.volreg.scale.tproject_ALL_GSasis.{ATLAS_NAME}_000.netcc')
+    if not osp.exists(netcc_path):
+        print('++ WARNING: %s is missing'% netcc_path)
+    netcc_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.e02.volreg.scale.tproject_ALL_GSdt5.{ATLAS_NAME}_000.netcc')
+    if not osp.exists(netcc_path):
+        print('++ WARNING: %s is missing'% netcc_path)
 
 # # 4. Load Motion information per scan
 
@@ -94,15 +100,13 @@ roi_info_df   = pd.read_csv(roi_info_path)
 
 power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0] for nw in list(roi_info_df['Network'].unique())}
 
-fcs = xr.DataArray(dims=['censor','scan','roi_x','roi_y'], coords={'censor':['ALL','KILL'],'scan':['.'.join([sbj,ses]) for sbj,ses in dataset_info_df.index],'roi_x':list(roi_info_df['ROI_Name']),'roi_y':list(roi_info_df['ROI_Name'])})
+fcs = xr.DataArray(dims=['censor','scan','roi_x','roi_y'], coords={'censor':['ALL','ALL_GSasis','ALL_GSdt5','KILL','KILL_GSasis','KILL_GSdt5'],'scan':['.'.join([sbj,ses]) for sbj,ses in dataset_info_df.index],'roi_x':list(roi_info_df['ROI_Name']),'roi_y':list(roi_info_df['ROI_Name'])})
 
 for sbj,ses in tqdm(list(dataset_info_df.index)):
-    netcc_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.e02.volreg.scale.tproject_ALL.{ATLAS_NAME}_000.netcc') # f'D02_Preproc_fMRI_{ses}',f'pb03.{sbj}.r01.e01.volreg.{ATLAS_NAME}_000.netcc')
-    netcc = load_netcc(netcc_path)
-    fcs.loc['ALL','.'.join([sbj,ses]),:,:] = netcc.values
-    netcc_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.e02.volreg.scale.tproject_KILL.{ATLAS_NAME}_000.netcc') # f'D02_Preproc_fMRI_{ses}',f'pb03.{sbj}.r01.e01.volreg.{ATLAS_NAME}_000.netcc')
-    netcc = load_netcc(netcc_path)
-    fcs.loc['KILL','.'.join([sbj,ses]),:,:] = netcc.values
+    for scenario in ['ALL','ALL_GSasis','ALL_GSdt5','KILL','KILL_GSasis','KILL_GSdt5'] :
+        netcc_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.e02.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netcc') 
+        netcc = load_netcc(netcc_path)
+        fcs.loc[scenario,'.'.join([sbj,ses]),:,:] = netcc.values
 
 scan_select = pn.widgets.Select(name='scan', options=list(fcs.coords['scan'].values))
 @pn.depends(scan_select)
@@ -111,10 +115,10 @@ def plot_fc(scan):
     aux = pd.DataFrame(aux,index=roi_info_df.set_index(['ROI_Name','ROI_ID','Hemisphere','Network','RGB']).index, 
                            columns=roi_info_df.set_index(['ROI_Name','ROI_ID','Hemisphere','Network','RGB']).index)
     plot_all = hvplot_fc(aux,major_label_overrides='regular_grid',cmap='RdBu_r', by='Network', add_labels=True, colorbar_position='left', net_cmap=power264_nw_cmap, cbar_title='FC-R (All Acquisitions)')
-    aux = fcs.sel(censor='KILL',scan=scan).values
+    aux = fcs.sel(censor='ALL_GSasis',scan=scan).values
     aux = pd.DataFrame(aux,index=roi_info_df.set_index(['ROI_Name','ROI_ID','Hemisphere','Network','RGB']).index, 
                            columns=roi_info_df.set_index(['ROI_Name','ROI_ID','Hemisphere','Network','RGB']).index)
-    plot_kill = hvplot_fc(aux,major_label_overrides='regular_grid',cmap='RdBu_r', by='Network', add_labels=True, colorbar_position='left', net_cmap=power264_nw_cmap, cbar_title='FC-R (Censoring | KILL)')
+    plot_kill = hvplot_fc(aux,major_label_overrides='regular_grid',cmap='RdBu_r', by='Network', add_labels=True, colorbar_position='left', net_cmap=power264_nw_cmap, cbar_title='FC-R (All acquisitions + GSasis)')
     
     return plot_all + plot_kill
 

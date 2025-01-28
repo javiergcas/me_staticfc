@@ -45,8 +45,8 @@ do
     rm rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc.*
 done
 
-echo "++ Compute GS in two different ways for each echo separately post volreg"
-echo "++ ---------------------------------------------------------------------"
+echo "++ Compute GS in two different ways for each echo separately post volreg & scaling"
+echo "++ -------------------------------------------------------------------------------"
 for EC in e01 e02 e03
 do
     # Global regression with no detrending prior to computing GS
@@ -54,33 +54,33 @@ do
                -mask mask_tedana_at_least_one_echo.nii.gz \
                 pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc.HEAD | awk '{print $1}' > pb03.${SBJ}.r01.${EC}.volreg.scale.GSasis.1D
     
-    # Alternative GS regression computing GS post detrending           
-    3dDetrend -overwrite \
-              -polort 5 \
-              -prefix pb03.${SBJ}.r01.${EC}.volreg.scale.dt5 \
-                      pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc
-    3dROIstats -quiet \
-               -mask mask_tedana_at_least_one_echo.nii.gz \
-               pb03.${SBJ}.r01.${EC}.volreg.scale.dt5+tlrc.HEAD | awk '{print $1}' > pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D
-    rm pb03.${SBJ}.r01.${EC}.volreg.scale.dt5+tlrc.*
+#    # Alternative GS regression computing GS post detrending           
+#    3dDetrend -overwrite \
+#              -polort 5 \
+#              -prefix pb03.${SBJ}.r01.${EC}.volreg.scale.dt5 \
+#                      pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc
+#    3dROIstats -quiet \
+#               -mask mask_tedana_at_least_one_echo.nii.gz \
+#               pb03.${SBJ}.r01.${EC}.volreg.scale.dt5+tlrc.HEAD | awk '{print $1}' > pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D
+#    rm pb03.${SBJ}.r01.${EC}.volreg.scale.dt5+tlrc.*
 done
 
-# Project MEICA components from each echo separately
-# --------------------------------------------------
-echo "++ Denoising each echo separately (Basic Denoising post volreg)"
-echo "++ ------------------------------------------------------------"
+echo "++ Denoising each echo separately (Basic & GS Pipelines)"
+echo "++ ------------------------------------------------------"
+
+# First we will do this with the different interpolation schemes
 for EC in e01 e02 e03
 do
   for INTERP_MODE in ZERO KILL NTRP
   do
     echo " + Denoising echo [${EC} | ${INTERP_MODE}]"
-    3dTproject -overwrite                                                             \
-               -polort 0                                                              \
-               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
-               -censor censor_${SBJ}_combined_2.1D                                    \
-               -cenmode ${INTERP_MODE}                                                \
-               -ort X.nocensor.xmat.1D                                                \
-               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}    \
+    3dTproject -overwrite                                                                   \
+               -polort 0                                                                    \
+               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                               \
+               -censor censor_${SBJ}_combined_2.1D                                          \
+               -cenmode ${INTERP_MODE}                                                      \
+               -ort X.nocensor.xmat.1D                                                      \
+               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic    \
                -mask mask_tedana_at_least_one_echo.nii.gz
     echo " + Denoising echo [${EC} | ${INTERP_MODE}] | GSasis"
     3dTproject -overwrite                                                                 \
@@ -93,18 +93,19 @@ do
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis \
                -mask mask_tedana_at_least_one_echo.nii.gz
     echo " + Denoising echo [${EC} | ${INTERP_MODE}] | GSdt5"
-    3dTproject -overwrite                                                                 \
-               -polort 0                                                                  \
-               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                             \
-               -censor censor_${SBJ}_combined_2.1D                                        \
-               -cenmode ${INTERP_MODE}                                                    \
-               -ort X.nocensor.xmat.1D                                                    \
-               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D                           \
-               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5  \
-               -mask mask_tedana_at_least_one_echo.nii.gz
+#    3dTproject -overwrite                                                                 \
+#               -polort 0                                                                  \
+#               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                             \
+#               -censor censor_${SBJ}_combined_2.1D                                        \
+#               -cenmode ${INTERP_MODE}                                                    \
+#               -ort X.nocensor.xmat.1D                                                    \
+#               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D                           \
+#               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5  \
+#               -mask mask_tedana_at_least_one_echo.nii.gz
   done
 done
 
+# Next we do this keeping all timepoins (i.e., no censoring)
 for EC in e01 e02 e03
 do
    echo " + Denoising echo [${EC} | ALL]"
@@ -112,7 +113,7 @@ do
                -polort 0                                                              \
                -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
                -ort X.nocensor.xmat.1D                                                \
-               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL               \
+               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_Basic         \
                -mask mask_tedana_at_least_one_echo.nii.gz
     echo " + Denoising echo [${EC} | ALL] | GSasis"
     3dTproject -overwrite                                                             \
@@ -122,14 +123,14 @@ do
                -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSasis.1D                      \
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_GSasis        \
                -mask mask_tedana_at_least_one_echo.nii.gz
-    echo " + Denoising echo [${EC} | ALL] | GSdt5"
-    3dTproject -overwrite                                                             \
-               -polort 0                                                              \
-               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
-               -ort X.nocensor.xmat.1D                                                \
-               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D                       \
-               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_GSdt5         \
-               -mask mask_tedana_at_least_one_echo.nii.gz
+#    echo " + Denoising echo [${EC} | ALL] | GSdt5"
+#    3dTproject -overwrite                                                             \
+#               -polort 0                                                              \
+#               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
+#               -ort X.nocensor.xmat.1D                                                \
+#               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D                       \
+#               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_GSdt5         \
+#               -mask mask_tedana_at_least_one_echo.nii.gz
 done
 
 # Extract ROI Timeseries
@@ -144,12 +145,12 @@ do
     3dNetCorr -overwrite                                                                          \
               -mask mask_tedana_at_least_one_echo.nii.gz                                          \
               -in_rois ${ATLAS_PATH}                                                              \
-              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}+tlrc            \
-              -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}.${ATLAS_NAME}
+              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc            \
+              -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}
 
     3dROIstats -quiet \
                -mask ${ATLAS_PATH} \
-               errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}.${ATLAS_NAME}_000.netts
+               errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}_000.netts
 
     echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR (asis) ]"
     3dNetCorr -overwrite                                                                               \
@@ -162,34 +163,35 @@ do
                -mask ${ATLAS_PATH} \
                errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}_000.netts
 
-    echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR (dt5) ]"
-    3dNetCorr -overwrite                                                                               \
-              -mask mask_tedana_at_least_one_echo.nii.gz                                               \
-              -in_rois ${ATLAS_PATH}                                                                   \
-              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc          \
-              -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}
-
-    3dROIstats -quiet \
-               -mask ${ATLAS_PATH} \
-               errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}_000.netts
+#    echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR (dt5) ]"
+#    3dNetCorr -overwrite                                                                               \
+#              -mask mask_tedana_at_least_one_echo.nii.gz                                               \
+#              -in_rois ${ATLAS_PATH}                                                                   \
+#              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc          \
+#              -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}
+#
+#    3dROIstats -quiet \
+#               -mask ${ATLAS_PATH} \
+#               errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc > #errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}_000.netts
 
   done
 done
 
 # Remove all the versions of GS
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ALL_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ALL_GSdt5+tlrc.*
+#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ALL_GSdt5+tlrc.*
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GSdt5+tlrc.*
+#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GSdt5+tlrc.*
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_GSdt5+tlrc.*
+#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_GSdt5+tlrc.*
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL_GSdt5+tlrc.*
+#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL_GSdt5+tlrc.*
 
 # Remove the denoised data without GS regression
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO+tlrc.*
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL+tlrc.*
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP+tlrc.*
+rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_Basic+tlrc.*
+rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL_Basic+tlrc.*
+rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_Basic+tlrc.*
+pwd
 echo "++ ========================="
 echo "++ Script finished correctly"
 echo "++ ========================="

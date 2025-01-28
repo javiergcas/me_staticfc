@@ -135,8 +135,14 @@ for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
 #
 # We wll also then compute the averages per scan, so that we can characterize a given scan in 2D space.
 
+# +
+# Abstract Submission Configuration: x_data,x_scenario,y_data,y_scenario = 'volreg','ALL','meica_dn','ALL'
+#x_data,x_scenario,y_data,y_scenario = 'volreg','ALL','volreg','ALL_GSasis'
+x_data,x_scenario,y_data,y_scenario = 'meica_dn','ALL','meica_dn','ALL_GSasis'
+
 slope_inter_xr_all    = {}
 slope_inter_xr_byscan = {}
+# -
 
 # Load ROI timeseries for all echo pairs, compute the FC-R matrices and estimate the empirical slopes and intercepts.
 #
@@ -154,9 +160,9 @@ for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
                       coords={'pair':  echo_pairs,
                               'edge':  np.arange(Ncons)})
     for (e_x,e_y) in echo_pairs_tuples:
-        roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+        roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.{x_data}.scale.tproject_{x_scenario}.{ATLAS_NAME}_000.netts')
         roi_ts_x      = np.loadtxt(roi_ts_path_x)
-        roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+        roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.{x_data}.scale.tproject_{x_scenario}.{ATLAS_NAME}_000.netts')
         roi_ts_y      = np.loadtxt(roi_ts_path_y)
         aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
         aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
@@ -188,9 +194,9 @@ for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
                       coords={'pair':  echo_pairs,
                               'edge':  np.arange(Ncons)})
     for (e_x,e_y) in echo_pairs_tuples:
-        roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.meica_dn.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+        roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.{y_data}.scale.tproject_{y_scenario}.{ATLAS_NAME}_000.netts')
         roi_ts_x      = np.loadtxt(roi_ts_path_x)
-        roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.meica_dn.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+        roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.{y_data}.scale.tproject_{y_scenario}.{ATLAS_NAME}_000.netts')
         roi_ts_y      = np.loadtxt(roi_ts_path_y)
         aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
         aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
@@ -273,3 +279,6 @@ fig.suptitle("Behavior for FC-R", fontsize=20)
 axs[1].scatter(aux.loc['sub-137_ses-1','Intercept (Basic)'],aux.loc['sub-137_ses-1','Slope (Basic)'],c='g',s=20)
 axs[1].scatter(aux.loc['sub-137_ses-1','Intercept (MEICA)'],aux.loc['sub-137_ses-1','Slope (MEICA)'],c='r',s=20)
 fig.tight_layout()
+# -
+
+

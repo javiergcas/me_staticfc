@@ -48,3 +48,5 @@ for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
                                                                                                             input_path=input_path,
                                                                                                             out_path=out_path)
     output  = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+
+

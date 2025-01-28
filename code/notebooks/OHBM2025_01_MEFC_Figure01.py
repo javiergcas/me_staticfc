@@ -69,11 +69,13 @@ power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0]
 #
 # This will work with the data following Basic denoising
 
+#scenario = 'ALL_GSasis'
+scenario = 'ALL'
 fc = {}
 for (e_x,e_y) in echo_pairs_tuples:
-    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
     roi_ts_x      = np.loadtxt(roi_ts_path_x)
-    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
     roi_ts_y      = np.loadtxt(roi_ts_path_y)
     aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
     aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
@@ -84,9 +86,9 @@ for (e_x,e_y) in echo_pairs_tuples:
     fc['C','Basic',(e_x,e_y)]  = pd.DataFrame(aux_c,index=roi_idxs,columns=roi_idxs)
 
 for (e_x,e_y) in echo_pairs_tuples:
-    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.meica_dn.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.meica_dn.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
     roi_ts_x      = np.loadtxt(roi_ts_path_x)
-    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.meica_dn.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.meica_dn.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
     roi_ts_y      = np.loadtxt(roi_ts_path_y)
     aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
     aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
@@ -148,9 +150,9 @@ ses='ses-2'
 
 fc = {}
 for (e_x,e_y) in echo_pairs_tuples:
-    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
     roi_ts_x      = np.loadtxt(roi_ts_path_x)
-    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_ALL.{ATLAS_NAME}_000.netts')
+    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
     roi_ts_y      = np.loadtxt(roi_ts_path_y)
     aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
     aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
@@ -221,3 +223,5 @@ for p in ['e01|e03_vs_e03|e03']:
     fc_plot_scatter_C.append(plot)
 
 fc_plot_scatter_C
+
+

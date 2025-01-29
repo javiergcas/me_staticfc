@@ -6,7 +6,7 @@
 
 This repository contains an HTML page with [results/Basic_2_MEICA.jpeg.html](results/Basic_2_MEICA.jpeg.html). The page is hosted using **GitHub Pages** and can be accessed directly through the following link:
 
-[View the HTML page here](https://<your-username>.github.io/<repository-name>/results/Basic_2_MEICA.jpeg.html)
+[View the HTML page here](https://javiergcas.github.io/me_staticfc/results/Basic_2_MEICA.jpeg.html)
 
 ## How to Set Up GitHub Pages
 

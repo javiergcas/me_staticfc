@@ -10,3 +10,5 @@ Below you can find links to these figures so you can explore them at your own pa
 
 
 1. [Pearson's based results for Basic and Tedana pre-processing pipelines](https://javiergcas.github.io/me_staticfc/results/Basic_2_MEICA.jpeg.html)
+
+2. [Covariance based FC vs. Frame-wise Displacement](https://javiergcas.github.io/me_staticfc/results/Cov_vs_Motion.html)

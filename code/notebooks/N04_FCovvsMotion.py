@@ -191,3 +191,7 @@ for scenario in tqdm(scenarios, desc='All scenarios'):
     plot_grid.append(plot)
 
 plot_grid
+
+plot_grid.save('../../results/Cov_vs_Motion.html')
+
+

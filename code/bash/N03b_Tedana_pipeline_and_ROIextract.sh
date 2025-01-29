@@ -1,7 +1,7 @@
-# 10/22/2024 - Javier Gonzalez-Castillo
+# 01/29/2025 - Javier Gonzalez-Castillo
 #
-# This script will denoise each echo independently
-#
+# This script will do the steps beyond afni_proc needed to complete the
+# (per-echo) TEDANA and TEDANA+GSR pipelines.
 #
 
 export OMP_NUM_THREADS=32
@@ -45,10 +45,6 @@ echo "============================================================"
 3dcalc -overwrite -b tedana_r01/dn_ts_e2.nii.gz -expr b -datum float -prefix pb06.${SBJ}.r01.e02.meica_dn
 3dcalc -overwrite -b tedana_r01/dn_ts_e3.nii.gz -expr b -datum float -prefix pb06.${SBJ}.r01.e03.meica_dn
 
-#3drefit -space MNI pb06.${SBJ}.r01.e01.meica_dn+orig
-#3drefit -space MNI pb06.${SBJ}.r01.e02.meica_dn+orig
-#3drefit -space MNI pb06.${SBJ}.r01.e03.meica_dn+orig
-
 echo "++ Scaling volreg versions of each echo:"
 echo "========================================"
 for EC in e01 e02 e03
@@ -75,15 +71,15 @@ do
                -mask mask_tedana_at_least_one_echo.nii.gz \
                 pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc.HEAD | awk '{print $1}' > pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSasis.1D
     
-    # Alternative GS regression computing GS post detrending           
-    3dDetrend -overwrite \
-              -polort 5 \
-              -prefix pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5 \
-                      pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc
-    3dROIstats -quiet \
-               -mask mask_tedana_at_least_one_echo.nii.gz \
-               pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5+tlrc.HEAD | awk '{print $1}' > pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSdt5.1D
-    rm pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5+tlrc.*
+#    # Alternative GS regression computing GS post detrending           
+#    3dDetrend -overwrite \
+#              -polort 5 \
+#              -prefix pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5 \
+#                      pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc
+#    3dROIstats -quiet \
+#               -mask mask_tedana_at_least_one_echo.nii.gz \
+#               pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5+tlrc.HEAD | awk '{print $1}' > pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSdt5.1D
+#    rm pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5+tlrc.*
 done
 
 
@@ -96,13 +92,13 @@ do
   for INTERP_MODE in ZERO KILL NTRP
   do
     echo " + Denoising echo [${EC} | ${INTERP_MODE}]"
-    3dTproject -overwrite                                                             \
-               -polort 0                                                              \
-               -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                       \
-               -censor censor_${SBJ}_combined_2.1D                                    \
-               -cenmode ${INTERP_MODE}                                                \
-               -ort X.nocensor.xmat.1D                                                \
-               -prefix errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_${INTERP_MODE}  \
+    3dTproject -overwrite                                                                  \
+               -polort 0                                                                   \
+               -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                            \
+               -censor censor_${SBJ}_combined_2.1D                                         \
+               -cenmode ${INTERP_MODE}                                                     \
+               -ort X.nocensor.xmat.1D                                                     \
+               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Tedana  \
                -mask mask_tedana_at_least_one_echo.nii.gz
   done
 done
@@ -110,37 +106,29 @@ done
 for EC in e01 e02 e03
 do
    echo " + Denoising echo [${EC} | ALL]"
-   3dTproject -overwrite                                                              \
-               -polort 0                                                              \
-               -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                       \
-               -ort X.nocensor.xmat.1D                                                \
-               -prefix errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_ALL             \
+   3dTproject -overwrite                                                                   \
+               -polort 0                                                                   \
+               -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                            \
+               -ort X.nocensor.xmat.1D                                                     \
+               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_Tedana             \
                -mask mask_tedana_at_least_one_echo.nii.gz
 done
 
-# Additional code for GSR
+# Additional code for Tedana + GSR Pipeline
+# -----------------------------------------
 for EC in e01 e02 e03
 do
   for INTERP_MODE in ZERO KILL NTRP
   do
     echo " + Denoising echo [${EC} | ${INTERP_MODE}]"
-    3dTproject -overwrite                                                                    \
-               -polort 0                                                                     \
-               -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                              \
-               -censor censor_${SBJ}_combined_2.1D                                           \
-               -cenmode ${INTERP_MODE}                                                       \
-               -ort X.nocensor.xmat.1D                                                       \
-               -ort pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSasis.1D                           \
-               -prefix errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_${INTERP_MODE}_GSasis  \
-               -mask mask_tedana_at_least_one_echo.nii.gz
-    3dTproject -overwrite                                                                    \
-               -polort 0                                                                     \
-               -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                              \
-               -censor censor_${SBJ}_combined_2.1D                                           \
-               -cenmode ${INTERP_MODE}                                                       \
-               -ort X.nocensor.xmat.1D                                                       \
-               -ort pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSdt5.1D                            \
-               -prefix errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_${INTERP_MODE}_GSdt5   \
+    3dTproject -overwrite                                                                       \
+               -polort 0                                                                        \
+               -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                                 \
+               -censor censor_${SBJ}_combined_2.1D                                              \
+               -cenmode ${INTERP_MODE}                                                          \
+               -ort X.nocensor.xmat.1D                                                          \
+               -ort pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSasis.1D                              \
+               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_TedanaGSasis \
                -mask mask_tedana_at_least_one_echo.nii.gz
   done
 done
@@ -153,14 +141,7 @@ do
                -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                       \
                -ort X.nocensor.xmat.1D                                                \
                -ort pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSasis.1D                    \
-               -prefix errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_ALL_GSasis      \
-               -mask mask_tedana_at_least_one_echo.nii.gz
-    3dTproject -overwrite                                                             \
-               -polort 0                                                              \
-               -input pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc                       \
-               -ort X.nocensor.xmat.1D                                                \
-               -ort pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSdt5.1D                     \
-               -prefix errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_ALL_GSdt5       \
+               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_TedanaGSasis  \
                -mask mask_tedana_at_least_one_echo.nii.gz
 done
 
@@ -170,35 +151,34 @@ echo "++ Extracting ROI Timeseries per echo for atlas [${ATLAS_NAME}]"
 echo "==============================================================="
 for EC in e01 e02 e03
 do
-  for INTERP_MODE in ZERO KILL NTRP ALL ZERO_GSasis KILL_GSasis NTRP_GSasis ALL_GSasis ZERO_GSdt5 KILL_GSdt5 NTRP_GSdt5 ALL_GSdt5
+  for INTERP_MODE in ZERO KILL NTRP ALL 
   do
-    echo " + Extracting ROI Timeseries and connectivity for [${EC}]"
-    3dNetCorr -overwrite                                                                          \
-              -mask mask_tedana_at_least_one_echo.nii.gz                                          \
-              -in_rois ${ATLAS_PATH}                                                              \
-              -inset  errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_${INTERP_MODE}+tlrc          \
-              -prefix errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_${INTERP_MODE}.${ATLAS_NAME}
+    for SCENARIO in Tedana TedanaGSasis
+       do
+       echo " + Extracting ROI Timeseries and connectivity for [${EC}]"
+       3dNetCorr -overwrite                                                                                    \
+                 -mask mask_tedana_at_least_one_echo.nii.gz                                                    \
+                 -in_rois ${ATLAS_PATH}                                                                        \
+                 -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_${SCENARIO}+tlrc          \
+                 -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_${SCENARIO}.${ATLAS_NAME}
 
-    3dROIstats -quiet \
-               -mask ${ATLAS_PATH} \
-               errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_${INTERP_MODE}+tlrc > errts.${SBJ}.r01.${EC}.meica_dn.scale.tproject_${INTERP_MODE}.${ATLAS_NAME}_000.netts
+       3dROIstats -quiet \
+                  -mask ${ATLAS_PATH} \
+                  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_${SCENARIO}+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_${SCENARIO}.${ATLAS_NAME}_000.netts
+    done 
   done
 done
 
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_ZERO+tlrc.*
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_NTRP+tlrc.*
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_KILL+tlrc.*
+rm errts.${SBJ}.r01.e0?.volreg.scale.tproject_ZERO_Tedana+tlrc.*
+rm errts.${SBJ}.r01.e0?.volreg.scale.tproject_NTRP_Tedana+tlrc.*
+rm errts.${SBJ}.r01.e0?.volreg.scale.tproject_KILL_Tedana+tlrc.*
 
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_ZERO_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_NTRP_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_KILL_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_ALL_GSasis+tlrc.*
+rm errts.${SBJ}.r01.e0?.volreg.scale.tproject_ZERO_TedanaGSasis+tlrc.*
+rm errts.${SBJ}.r01.e0?.volreg.scale.tproject_NTRP_TedanaGSasis+tlrc.*
+rm errts.${SBJ}.r01.e0?.volreg.scale.tproject_KILL_TedanaGSasis+tlrc.*
+rm errts.${SBJ}.r01.e0?.volreg.scale.tproject_ALL_TedanaGSasis+tlrc.*
 
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_ZERO_GSdt5+tlrc.*
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_NTRP_GSdt5+tlrc.*
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_KILL_GSdt5+tlrc.*
-rm errts.${SBJ}.r01.e0?.meica_dn.scale.tproject_ALL_GSdt5+tlrc.*
-
+pwd
 echo "++ ========================="
 echo "++ Script finished correctly"
 echo "++ ========================="

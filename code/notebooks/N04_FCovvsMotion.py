@@ -43,6 +43,7 @@ import holoviews as hv
 import xarray as xr
 import panel as pn
 from itertools import combinations_with_replacement
+import panel as pn
 
 # # 1. Load Dataset Information
 
@@ -192,6 +193,6 @@ for scenario in tqdm(scenarios, desc='All scenarios'):
 
 plot_grid
 
-plot_grid.save('../../results/Cov_vs_Motion.html')
+pn.Column(pn.pane.Markdown('## FC (Covariance) vs. Motion (Mean Framewise Displacement) across pre-processing pipelines \n Top row shows results when no censoring is applied (e.g., ALL volumes) and bottom row when censoring is applied (e.g., KILL volumes)'), plot_grid).save('../../results/Cov_vs_Motion.html')
 
 

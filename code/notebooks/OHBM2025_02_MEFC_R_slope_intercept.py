@@ -88,6 +88,8 @@ pairs_of_echo_pairs = ['|'.join((e_x[0],e_x[1]))+'_vs_'+'|'.join((e_y[0],e_y[1])
 print('Echo Pairs[n=%d]=%s' %(len(echo_pairs),str(echo_pairs)))
 print('Pairs of Echo Pairs[n=%d]=%s' %(len(pairs_of_echo_pairs),str(pairs_of_echo_pairs)))
 
+echoes_dict = {'e01':13.7,'e02':30,'e03':47}
+
 scan_names = ['_'.join((sbj,ses)) for sbj,ses in dataset_scan_list]
 
 # # 1. Load Basic Quality Information for each scan
@@ -129,20 +131,14 @@ for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
     rsme_df.loc[scan_name,'Avg. RSME'] = rsme
 
 # # 2. Pearson's FC Slope and Intercept
-# ## 2.1. Load the data following basic denosing
+# ## 2.1. Load FC and compute slope
 #
 # We will create an xr.DataArray that will hold the slope and intercept of contrasting all 15 FC matrices for each scan separately. 
 #
 # We wll also then compute the averages per scan, so that we can characterize a given scan in 2D space.
 
-# +
-# Abstract Submission Configuration: x_data,x_scenario,y_data,y_scenario = 'volreg','ALL','meica_dn','ALL'
-#x_data,x_scenario,y_data,y_scenario = 'volreg','ALL','volreg','ALL_GSasis'
-x_data,x_scenario,y_data,y_scenario = 'meica_dn','ALL','meica_dn','ALL_GSasis'
-
 slope_inter_xr_all    = {}
 slope_inter_xr_byscan = {}
-# -
 
 # Load ROI timeseries for all echo pairs, compute the FC-R matrices and estimate the empirical slopes and intercepts.
 #
@@ -150,85 +146,111 @@ slope_inter_xr_byscan = {}
 
 # +
 # %%time
-slope_inter_xr_all['Basic'] = xr.DataArray(dims=['scan','echo_pairing','statistic'],
-                        coords={'scan':['_'.join((sbj,ses)) for sbj,ses in dataset_scan_list],
-                                'echo_pairing':pairs_of_echo_pairs,
-                                'statistic':['Slope','Intercept']})
 
-for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
-    fc_xr_all       = xr.DataArray(dims=['pair','edge'],
-                      coords={'pair':  echo_pairs,
-                              'edge':  np.arange(Ncons)})
-    for (e_x,e_y) in echo_pairs_tuples:
-        roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.{x_data}.scale.tproject_{x_scenario}.{ATLAS_NAME}_000.netts')
-        roi_ts_x      = np.loadtxt(roi_ts_path_x)
-        roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.{x_data}.scale.tproject_{x_scenario}.{ATLAS_NAME}_000.netts')
-        roi_ts_y      = np.loadtxt(roi_ts_path_y)
-        aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
-        aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
-        # Compute the full correlation matrix between aux_ts_x and aux_ts_y
-        aux_r   = np.corrcoef(aux_ts_x.T, aux_ts_y.T)[:aux_ts_x.shape[1], aux_ts_x.shape[1]:]
-        aux_r_v = sym_matrix_to_vec(aux_r, discard_diagonal=True)
-        fc_xr_all.loc['|'.join((e_x,e_y)),:] = aux_r_v
+slope_inter_xr_all = xr.DataArray(dims=['scan','echo_pairing','censor_mode','preproc_mode','statistic'],
+                                            coords={'scan':['_'.join((sbj,ses)) for sbj,ses in dataset_scan_list],
+                                            'echo_pairing':pairs_of_echo_pairs,
+                                            'censor_mode':['ALL'],
+                                            'preproc_mode':['Basic','GSasis','Tedana'],
+                                            'statistic':['Slope','Intercept']})
 
-    for pair_of_pairs in combinations(fc_xr_all.pair.values,2):
-        slope, intercept = np.polyfit(fc_xr_all.sel(pair=pair_of_pairs[0]),fc_xr_all.sel(pair=pair_of_pairs[1]),1)
-        slope_inter_xr_all['Basic'].loc['_'.join((sbj,ses)),'_vs_'.join(pair_of_pairs),'Slope'] = slope
-        slope_inter_xr_all['Basic'].loc['_'.join((sbj,ses)),'_vs_'.join(pair_of_pairs),'Intercept'] = intercept
-
-# Average across all TE pairs
-slope_inter_xr_byscan['Basic'] = slope_inter_xr_all['Basic'].mean(dim='echo_pairing')
+for censor_mode in ['ALL']:
+    for preproc_mode in ['Basic','GSasis','Tedana']:
+        scenario = '_'.join([censor_mode,preproc_mode])
+        for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
+            fc_xr_all       = xr.DataArray(dims=['pair','edge'],
+                              coords={'pair':  echo_pairs,
+                                      'edge':  np.arange(Ncons)})
+            for (e_x,e_y) in echo_pairs_tuples:
+                # Load ROI Timeseries
+                roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts') 
+                roi_ts_x      = np.loadtxt(roi_ts_path_x)
+                roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts') 
+                roi_ts_y      = np.loadtxt(roi_ts_path_y)
+                aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
+                aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
+                # Compute the full correlation matrix between aux_ts_x and aux_ts_y
+                aux_r   = np.corrcoef(aux_ts_x.T, aux_ts_y.T)[:aux_ts_x.shape[1], aux_ts_x.shape[1]:]
+                aux_r_v = sym_matrix_to_vec(aux_r, discard_diagonal=True)
+                fc_xr_all.loc['|'.join((e_x,e_y)),:] = aux_r_v
+            # Once FC for all possible pairs is loaded, then we look at slope and intercept for all combinations
+            for pair_of_pairs in combinations(fc_xr_all.pair.values,2):
+                slope, intercept = np.polyfit(fc_xr_all.sel(pair=pair_of_pairs[0]),fc_xr_all.sel(pair=pair_of_pairs[1]),1)
+                slope_inter_xr_all.loc['_'.join((sbj,ses)),'_vs_'.join(pair_of_pairs),censor_mode,preproc_mode,'Slope']     = slope
+                slope_inter_xr_all.loc['_'.join((sbj,ses)),'_vs_'.join(pair_of_pairs),censor_mode,preproc_mode,'Intercept'] = intercept
 # -
+
+slope_inter_xr_byscan = slope_inter_xr_all.mean(dim='echo_pairing')
 
 # ## 2.2. Load the data following advanced denosing
 
-# +
+# + active=""
 # %%time
-slope_inter_xr_all['MEICA'] =  xr.DataArray(dims=['scan','echo_pairing','statistic'],
-                        coords={'scan':['_'.join((sbj,ses)) for sbj,ses in dataset_scan_list],
-                                'echo_pairing':pairs_of_echo_pairs,
-                                'statistic':['Slope','Intercept']})
-
-for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
-    fc_xr_all       = xr.DataArray(dims=['pair','edge'],
-                      coords={'pair':  echo_pairs,
-                              'edge':  np.arange(Ncons)})
-    for (e_x,e_y) in echo_pairs_tuples:
-        roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.{y_data}.scale.tproject_{y_scenario}.{ATLAS_NAME}_000.netts')
-        roi_ts_x      = np.loadtxt(roi_ts_path_x)
-        roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.{y_data}.scale.tproject_{y_scenario}.{ATLAS_NAME}_000.netts')
-        roi_ts_y      = np.loadtxt(roi_ts_path_y)
-        aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
-        aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
-        # Compute the full correlation matrix between aux_ts_x and aux_ts_y
-        aux_r   = np.corrcoef(aux_ts_x.T, aux_ts_y.T)[:aux_ts_x.shape[1], aux_ts_x.shape[1]:]
-        aux_r_v = sym_matrix_to_vec(aux_r, discard_diagonal=True)
-        fc_xr_all.loc['|'.join((e_x,e_y)),:] = aux_r_v
-
-    for pair_of_pairs in combinations(fc_xr_all.pair.values,2):
-        slope, intercept = np.polyfit(fc_xr_all.sel(pair=pair_of_pairs[0]),fc_xr_all.sel(pair=pair_of_pairs[1]),1)
-        slope_inter_xr_all['MEICA'].loc['_'.join((sbj,ses)),'_vs_'.join(pair_of_pairs),'Slope'] = slope
-        slope_inter_xr_all['MEICA'].loc['_'.join((sbj,ses)),'_vs_'.join(pair_of_pairs),'Intercept'] = intercept
-
-# Average across all TE pairs
-slope_inter_xr_byscan['MEICA'] = slope_inter_xr_all['MEICA'].mean(dim='echo_pairing')
+# slope_inter_xr_all['MEICA'] =  xr.DataArray(dims=['scan','echo_pairing','statistic'],
+#                         coords={'scan':['_'.join((sbj,ses)) for sbj,ses in dataset_scan_list],
+#                                 'echo_pairing':pairs_of_echo_pairs,
+#                                 'statistic':['Slope','Intercept']})
+#
+# for i,(sbj,ses) in enumerate(tqdm(dataset_scan_list)):
+#     fc_xr_all       = xr.DataArray(dims=['pair','edge'],
+#                       coords={'pair':  echo_pairs,
+#                               'edge':  np.arange(Ncons)})
+#     for (e_x,e_y) in echo_pairs_tuples:
+#         roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.{y_data}.scale.tproject_{y_scenario}.{ATLAS_NAME}_000.netts')
+#         roi_ts_x      = np.loadtxt(roi_ts_path_x)
+#         roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.{y_data}.scale.tproject_{y_scenario}.{ATLAS_NAME}_000.netts')
+#         roi_ts_y      = np.loadtxt(roi_ts_path_y)
+#         aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
+#         aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
+#         # Compute the full correlation matrix between aux_ts_x and aux_ts_y
+#         aux_r   = np.corrcoef(aux_ts_x.T, aux_ts_y.T)[:aux_ts_x.shape[1], aux_ts_x.shape[1]:]
+#         aux_r_v = sym_matrix_to_vec(aux_r, discard_diagonal=True)
+#         fc_xr_all.loc['|'.join((e_x,e_y)),:] = aux_r_v
+#
+#     for pair_of_pairs in combinations(fc_xr_all.pair.values,2):
+#         slope, intercept = np.polyfit(fc_xr_all.sel(pair=pair_of_pairs[0]),fc_xr_all.sel(pair=pair_of_pairs[1]),1)
+#         slope_inter_xr_all['MEICA'].loc['_'.join((sbj,ses)),'_vs_'.join(pair_of_pairs),'Slope'] = slope
+#         slope_inter_xr_all['MEICA'].loc['_'.join((sbj,ses)),'_vs_'.join(pair_of_pairs),'Intercept'] = intercept
+#
+# # Average across all TE pairs
+# slope_inter_xr_byscan['MEICA'] = slope_inter_xr_all['MEICA'].mean(dim='echo_pairing')
 # -
 
 # # 3. Prepare Plots
 #
 # ## 3.1. Combine motion, BOLD variance, RMSE and Avg. Slopes and Intercepts into single Dataframe
 
-aux_basic = pd.DataFrame(slope_inter_xr_byscan['Basic'].values,columns=['Slope (Basic)','Intercept (Basic)'],index=scan_names)
+# +
+aux_basic            = pd.DataFrame(slope_inter_xr_byscan.loc[:,'ALL','Basic',:].values,columns=['Slope (Basic)','Intercept (Basic)'],index=scan_names)
 aux_basic.index.name = 'scan'
-aux_meica = pd.DataFrame(slope_inter_xr_byscan['MEICA'].values,columns=['Slope (MEICA)','Intercept (MEICA)'],index=scan_names)
+
+aux_meica            = pd.DataFrame(slope_inter_xr_byscan.loc[:,'ALL','Tedana',:].values,columns=['Slope (MEICA)','Intercept (MEICA)'],index=scan_names)
 aux_meica.index.name = 'scan'
-aux = pd.concat([aux_basic,aux_meica, mot_df, tedana_df],axis=1)
+
+aux_gsr            = pd.DataFrame(slope_inter_xr_byscan.loc[:,'ALL','GSasis',:].values,columns=['Slope (GSR)','Intercept (GSR)'],index=scan_names)
+aux_gsr.index.name = 'scan'
+
+aux = pd.concat([aux_basic,aux_meica, aux_gsr, mot_df, tedana_df],axis=1)
 aux['Percent Censored'] = (aux['Percent Censored'].astype(float)+1)*2
 aux['Percent Used'] = aux['Percent Used'].astype(float)
 aux['Var. likely-BOLD'] = aux['Var. likely-BOLD'].astype(float)
 aux['Var. unlikely-BOLD'] = aux['Var. unlikely-BOLD'].astype(float)
 aux['Var. accepted'] = aux['Var. accepted'].astype(float)
 aux['Var. rejected'] = aux['Var. rejected'].astype(float)
+
+# + active=""
+# aux_basic = pd.DataFrame(slope_inter_xr_byscan['Basic'].values,columns=['Slope (Basic)','Intercept (Basic)'],index=scan_names)
+# aux_basic.index.name = 'scan'
+# aux_meica = pd.DataFrame(slope_inter_xr_byscan['MEICA'].values,columns=['Slope (MEICA)','Intercept (MEICA)'],index=scan_names)
+# aux_meica.index.name = 'scan'
+# aux = pd.concat([aux_basic,aux_meica, mot_df, tedana_df],axis=1)
+# aux['Percent Censored'] = (aux['Percent Censored'].astype(float)+1)*2
+# aux['Percent Used'] = aux['Percent Used'].astype(float)
+# aux['Var. likely-BOLD'] = aux['Var. likely-BOLD'].astype(float)
+# aux['Var. unlikely-BOLD'] = aux['Var. unlikely-BOLD'].astype(float)
+# aux['Var. accepted'] = aux['Var. accepted'].astype(float)
+# aux['Var. rejected'] = aux['Var. rejected'].astype(float)
+# -
 
 # Create annotation of perpendicular dashed lines signaling the (0,1) point
 
@@ -237,7 +259,8 @@ fc_optimal_point = hv.VLine(0).opts(color='k',line_dash='dashed',line_width=1) *
 # Show location of scans in [Slope,Intercept] plane for Basic (left) and Advanced (right) denoising
 
 aux.hvplot.scatter(x='Intercept (Basic)',y='Slope (Basic)',aspect='square',s='Percent Censored',hover_cols=['scan'], cmap='viridis', c='Var. accepted',alpha=.7,xlim=(-0.02,0.15),ylim=(0.45,1.1)).opts(fontscale=1.5, colorbar_opts={'title':'% BOLD Variance:'})*fc_optimal_point + \
-aux.hvplot.scatter(x='Intercept (MEICA)',y='Slope (MEICA)',aspect='square',s='Percent Censored',hover_cols=['scan'], cmap='viridis', c='Var. accepted',alpha=.7,xlim=(-0.02,0.15),ylim=(0.45,1.1)).opts(fontscale=1.5, colorbar_opts={'title':'% BOLD Variance:'})*fc_optimal_point
+aux.hvplot.scatter(x='Intercept (MEICA)',y='Slope (MEICA)',aspect='square',s='Percent Censored',hover_cols=['scan'], cmap='viridis', c='Var. accepted',alpha=.7,xlim=(-0.02,0.15),ylim=(0.45,1.1)).opts(fontscale=1.5, colorbar_opts={'title':'% BOLD Variance:'})*fc_optimal_point + \
+aux.hvplot.scatter(x='Intercept (GSR)',y='Slope (GSR)',aspect='square',s='Percent Censored',hover_cols=['scan'], cmap='viridis', c='Var. accepted',alpha=.7,xlim=(-0.02,0.15),ylim=(0.45,1.1)).opts(fontscale=1.5, colorbar_opts={'title':'% BOLD Variance:'})*fc_optimal_point
 
 # ## 3.2. Same information in a single figure in the form of a vector field
 #
@@ -278,6 +301,41 @@ fig.suptitle("Behavior for FC-R", fontsize=20)
 
 axs[1].scatter(aux.loc['sub-137_ses-1','Intercept (Basic)'],aux.loc['sub-137_ses-1','Slope (Basic)'],c='g',s=20)
 axs[1].scatter(aux.loc['sub-137_ses-1','Intercept (MEICA)'],aux.loc['sub-137_ses-1','Slope (MEICA)'],c='r',s=20)
+fig.tight_layout()
+# -
+aux['u']     = aux['Intercept (GSR)'] - aux['Intercept (Basic)']
+aux['v']     = aux['Slope (GSR)'] - aux['Slope (Basic)']
+aux['mag']   = np.sqrt(aux['u']**2 + aux['v']**2)
+aux['angle'] = (np.pi/2.) - np.arctan2(aux['u']/aux['mag'], aux['v']/aux['mag'])
+aux['Aproachment'] = np.sqrt((aux['Intercept (Basic)'] - 0)**2+(aux['Slope (Basic)'] - 1)**2) - np.sqrt((aux['Intercept (GSR)'] - 0)**2+(aux['Slope (GSR)'] - 1)**2)
+
+# +
+fig,axs=plt.subplots(1,2,figsize=(13, 5))
+basic_scat      = axs[0].scatter(aux['Intercept (Basic)'],aux['Slope (Basic)'],c=aux['Var. accepted'],s=aux['Percent Censored'])
+basic_scat_cbar = plt.colorbar(basic_scat)
+basic_scat_cbar.set_label('Percent Variance Explained by Accepted Components',fontsize=10)
+axs[0].axvline(0,c='k',linestyle='--', linewidth=0.5)
+axs[0].axhline(1,c='k',linestyle='--', linewidth=0.5)
+axs[0].set_ylim(.45,1.1)
+axs[0].set_xlim(-0.02,0.15)
+axs[0].set_xlabel('Intercept', fontsize=14)
+axs[0].set_ylabel('Slope', fontsize=14)
+axs[1].scatter(aux['Intercept (Basic)'],aux['Slope (Basic)'],color='k',s=0.5,)
+axs[1].scatter(aux['Intercept (GSR)'],aux['Slope (GSR)'],color='k',s=0.5)
+qiv = axs[1].quiver(aux['Intercept (Basic)'],aux['Slope (Basic)'],aux['u'], aux['v'], aux['Aproachment'], angles='xy', scale_units='xy', scale=1, cmap='seismic_r', clim=(-0.05,0.05))
+qiv_cbar = plt.colorbar(qiv)
+qiv_cbar.set_label('Distance to Ideal (Basic) - Distance to Ideal (GSR)',fontsize=10)
+
+axs[1].set_ylim(.45,1.1)
+axs[1].set_xlim(-0.02,0.15)
+axs[1].axvline(0,c='k',linestyle='--', linewidth=0.5)
+axs[1].axhline(1,c='k',linestyle='--', linewidth=0.5)
+axs[1].set_xlabel('Intercept', fontsize=14)
+axs[1].set_ylabel('Slope', fontsize=14)
+fig.suptitle("Behavior for FC-R", fontsize=20)
+
+axs[1].scatter(aux.loc['sub-137_ses-1','Intercept (Basic)'],aux.loc['sub-137_ses-1','Slope (Basic)'],c='g',s=20)
+axs[1].scatter(aux.loc['sub-137_ses-1','Intercept (GSR)'],aux.loc['sub-137_ses-1','Slope (GSR)'],c='r',s=20)
 fig.tight_layout()
 # -
 

@@ -122,6 +122,13 @@ b = report_keepers_df.hvplot.hist('max motion displacement', bins=np.linspace(0,
 report_summary_df['max motion displacement'].hvplot.hist('max motion displacement', bins=np.linspace(0,6,50), label='all', alpha=.5, normed=True)
 a+b
 
+report_keepers_df.columns
+
+worse_subject = report_keepers_df.sort_values(by='num TRs per run (applied)').reset_index().iloc[0]['infile']
+best_subject = report_keepers_df.sort_values(by='num TRs per run (applied)').reset_index().iloc[-1]['infile']
+print('++ INFO: Best subject: %s' % best_subject)
+print('++ INFO: Worse subject: %s' % worse_subject)
+
 # Most likely we will use 'max censored displacement' as the estimate of motion when doing the Powers et al. business. As according to AFNI Discourse (https://discuss.afni.nimh.nih.gov/t/max-motion-displacement-question/2754/3)... "The censored displacement just considers time points that were not removed, those that are still in the time series after censoring. It is more useful, since those are the time points that will be considered in the regression."
 
 # # 4. Check TSNR

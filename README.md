@@ -8,9 +8,10 @@ Most notebooks in this project generate dynamic figures using holoviz libraries.
 
 Below you can find links to these figures so you can explore them at your own pace.
 
+1. [Theoretical Behavior for Correlation based FC when computed across different echo time pairs](https://javiergcas.github.io/me_staticfc/results/FCR_theoretical_behavior_across_echoes.html')
 
-1. [Correlation based results for Basic and Tedana pre-processing pipelines](https://javiergcas.github.io/me_staticfc/results/Basic_2_MEICA.jpeg.html)
+2. [Correlation based results for Basic and Tedana pre-processing pipelines](https://javiergcas.github.io/me_staticfc/results/Basic_2_MEICA.jpeg.html)
 
-2. [Correlation based FC vs. Frame-wise Displacement](https://javiergcas.github.io/me_staticfc/results/Corr_vs_Motion.html)
+3. [Correlation based FC vs. Frame-wise Displacement](https://javiergcas.github.io/me_staticfc/results/Corr_vs_Motion.html)
 
-3. [Covariance based FC vs. Frame-wise Displacement](https://javiergcas.github.io/me_staticfc/results/Cov_vs_Motion.html)
+4. [Covariance based FC vs. Frame-wise Displacement](https://javiergcas.github.io/me_staticfc/results/Cov_vs_Motion.html)

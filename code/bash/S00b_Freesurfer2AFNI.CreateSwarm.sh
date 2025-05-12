@@ -1,3 +1,6 @@
+# Author: Javier Gonzalez-Castillo
+# Date: 02/28/2025
+# Purpose: Run @SUMA_Make_Spec_FS on the large publicly available dataset
 set -e
 
 ORIG_DATA_DIR='/data/SFIMJGC_HCP7T/BCBL2024/openeuro/des003592-download/'
@@ -8,7 +11,7 @@ SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S00b_Freesurfer2
 LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S00b_Freesurfer2AFNI.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "sub-*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
-#echo "++ Subjects          : ${subjects[@]}"
+echo "++ Subjects          : ${subjects[@]}"
 echo "++ Orig Data Folder  : ${ORIG_DATA_DIR}"
 echo "++ Swarm Folder      : ${SWARM_PATH}"
 echo "++ Logs Folder       : ${LOGS_DIR}"

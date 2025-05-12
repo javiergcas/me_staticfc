@@ -20,13 +20,6 @@ if [[ -z ${AFNIPROC_OUTDIR} ]]; then
 else
    FMRI_DATA_DIR=`echo ${AFNIPROC_OUTDIR}/`
    echo "++ INFO: Setting FMRI_DATA_DIR=${FMRI_DATA_DIR} as provided via AFNIPROC_OUTDIR"
-   # As we want to use exactly the same FOV mask, we link to that created earlier for the non-NORDIC pipeline
-   if [ -L ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ] && [ -e ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ] ; then
-      echo "++ INFO: Link to ME mask already exists."
-   else
-      echo "++ INFO: Creating link to ME mask from non-NORDIC pipeline"
-      ln -fs ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ${FMRI_DATA_DIR}/mask_tedana_at_least_one_echo.nii.gz
-   fi
 fi
 # End of trick
 
@@ -45,6 +38,7 @@ echo "++ Entering FMRI_DATA_DIR"
 echo "========================="
 cd ${FMRI_DATA_DIR}
 echo " +  `pwd`"
+ln -fs ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ${FMRI_DATA_DIR}/mask_tedana_at_least_one_echo.nii.gz
 
 # This should happen right after afni_proc finishes... need to move it
 #3dcalc -overwrite -a tedana_r01/adaptive_mask.nii.gz -expr 'step(a)' -prefix mask_tedana_at_least_one_echo.nii.gz
@@ -88,21 +82,13 @@ do
     3dROIstats -quiet \
                -mask mask_tedana_at_least_one_echo.nii.gz \
                 pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc.HEAD | awk '{print $1}' > pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSasis.1D
-    
-#    # Alternative GS regression computing GS post detrending           
-#    3dDetrend -overwrite \
-#              -polort 5 \
-#              -prefix pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5 \
-#                      pb07.${SBJ}.r01.${EC}.meica_dn.scale+tlrc
-#    3dROIstats -quiet \
-#               -mask mask_tedana_at_least_one_echo.nii.gz \
-#               pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5+tlrc.HEAD | awk '{print $1}' > pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSdt5.1D
-#    rm pb07.${SBJ}.r01.${EC}.meica_dn.scale.dt5+tlrc.*
 done
 
 
 # Project MEICA components from each echo separately
 # --------------------------------------------------
+# NOTE (May 12, 2025): I do not think we need to change anything here becuase the CompCorr regressor in this case should be able to benefit
+#                      from whatever we have done (e.g., NORDIC or not)
 echo "++ Denoising each echo separately (using MEICA bad components)"
 echo "=============================================================="
 for EC in e01 e02 e03

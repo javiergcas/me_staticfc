@@ -1,6 +1,7 @@
 import os.path as osp
 import pandas as pd
 import numpy as np
+from itertools import combinations_with_replacement, combinations
 
 PRJ_DIR       = '/data/SFIMJGC_HCP7T/BCBL2024/'
 ATLAS_NAME    = 'Schaefer2018_400Parcels_17Networks'
@@ -9,12 +10,23 @@ PRCS_DATA_DIR = osp.join(PRJ_DIR,'prcs_data')
 ATLASES_DIR   = osp.join(PRJ_DIR,'atlases')
 CODE_DIR      = osp.join(PRJ_DIR,'me_staticfc','code')
 
-# Echo Time information for the Spreng Dataset
-TES_MSEC_PER_SCANNER = {'1':{'e01':13.7,'e02':30,'e03':47},
-                        '2':{'e01':14,'e02':29.96,'e03':45.92}}
+TES_MSEC = {'Gating':{'e01':13.9,'e02':31.7, 'e03':49.5},
+            'Spreng_Scanner1':{'e01':13.7,'e02':30,'e03':47},
+            }
 
+SESSIONS = {'Gating':['constant_gating','cardiac_gating'],
+            'Spreng_Scanner1':['ses-1','ses-2']}
+
+echo_pairs_tuples   = [i for i in combinations_with_replacement(['e01','e02','e03'],2)]
+echo_pairs          = [('|').join(i) for i in echo_pairs_tuples]
+pairs_of_echo_pairs = ['|'.join((e_x[0],e_x[1]))+'_vs_'+'|'.join((e_y[0],e_y[1])) for e_x,e_y in combinations(echo_pairs_tuples,2)]
+
+# Echo Time information for the Spreng Dataset
+#TES_MSEC_PER_SCANNER = {'1':{'e01':13.7,'e02':30,'e03':47},
+#                        '2':{'e01':14,'e02':29.96,'e03':45.92}}
+#
 # We are only working with data from Site 1
-TES_MSEC = TES_MSEC_PER_SCANNER['1']
+#TES_MSEC = TES_MSEC_PER_SCANNER['1']
 
 Power264_cmap = {''}
 
@@ -69,3 +81,31 @@ def read_gen_ss_review_table(file_path):
             df[c] = df[c]
     print("++ INFO [read_gen_ss_review_table]: Number of scans = %d | Number of metrics per scan = %d" % (df.shape))
     return df
+
+# QA-related functions
+
+def project_points(x, y, m, b):
+    """Project points (x, y) onto the line y = mx + b."""
+    denom = 1 + m**2
+    x_p = (x + m * (y - b)) / denom
+    y_p = m * x_p + b
+    return x_p, y_p
+
+def compute_residuals(x, y, m, b):
+    """Compute residuals after projection onto the line y = mx + b."""
+    x_p, y_p = project_points(x, y, m, b)
+    residuals = np.sqrt((x - x_p)**2 + (y - y_p)**2)
+    return residuals
+
+def softmax(x):
+  """
+  Computes the softmax function for a given input vector x.
+
+  Args:
+    x: A NumPy array representing the input vector.
+
+  Returns:
+    A NumPy array representing the softmax output.
+  """
+  exp_x = np.exp(x - np.max(x)) # Subtracting max(x) for numerical stability
+  return exp_x / np.sum(exp_x)

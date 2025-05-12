@@ -1,14 +1,17 @@
+# Author: Javier Gonzalez-Castillo
+# Date: 02/28/2025
+# Purpose: Run @SUMA_Make_Spec_FS on the cardiac gating dataset
 set -e
 
 ORIG_DATA_DIR='/data/SFIMJGC_HCP7T/BCBL2024/openeuro/meica_eval/'
 SUBJECTS_DIR='/data/SFIMJGC_HCP7T/BCBL2024/freesurfer/'
 RESOURCES_DIR='/data/SFIMJGC_HCP7T/BCBL2024/resources/'
 USERNAME=`whoami`
-SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S00b_Freesurfer2AFNI.SWARM.sh`
-LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S00b_Freesurfer2AFNI.logs`
+SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S00b_Freesurfer2AFNI.meica_eval.SWARM.sh`
+LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S00b_Freesurfer2AFNI.meica_eval.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "MGSBJ*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
-#echo "++ Subjects          : ${subjects[@]}"
+echo "++ Subjects          : ${subjects[@]}"
 echo "++ Orig Data Folder  : ${ORIG_DATA_DIR}"
 echo "++ Swarm Folder      : ${SWARM_PATH}"
 echo "++ Logs Folder       : ${LOGS_DIR}"

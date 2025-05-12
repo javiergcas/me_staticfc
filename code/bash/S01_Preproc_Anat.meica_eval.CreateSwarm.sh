@@ -6,11 +6,11 @@ PRCS_DATA_DIR='/data/SFIMJGC_HCP7T/BCBL2024/prcs_data/'
 RESOURCES_DIR='/data/SFIMJGC_HCP7T/BCBL2024/resources/'
 SCRIPTS_DIR='/data/SFIMJGC_HCP7T/BCBL2024/me_staticfc/code/bash/'
 USERNAME=`whoami`
-SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S01_Preproc_Anat.SWARM.sh`
-LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S01_Preproc_Anat.logs`
+SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S01_Preproc_Anat.meica_eval.SWARM.sh`
+LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S01_Preproc_Anat.meica_eval.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "MGSBJ*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
-#echo "++ Subjects          : ${subjects[@]}"
+echo "++ Subjects          : ${subjects[@]}"
 echo "++ Orig Data Folder  : ${ORIG_DATA_DIR}"
 echo "++ Swarm Folder      : ${SWARM_PATH}"
 echo "++ Logs Folder       : ${LOGS_DIR}"
@@ -35,7 +35,7 @@ fi
 # Write top comment in Swarm file 
 # -------------------------------
 echo "#Creation Date: `date`" > ${SWARM_PATH}
-echo "#swarm -f ${SWARM_PATH} -g 32 -t 32 --partition quick,norm --module afni --logdir ${LOGS_DIR} --sbatch \"--export AFNI_COMPRESSOR=GZIP\"" > ${SWARM_PATH}
+echo "#swarm -f ${SWARM_PATH} --time 03:59:59 -g 32 -t 32 --partition quick,norm --module afni --logdir ${LOGS_DIR} --sbatch \"--export AFNI_COMPRESSOR=GZIP\"" > ${SWARM_PATH}
 
 for sbj_path in ${subjects[@]}
 do

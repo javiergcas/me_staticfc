@@ -43,7 +43,7 @@ echo " +  `pwd`"
 ln -fs ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ${FMRI_DATA_DIR}/mask_tedana_at_least_one_echo.nii.gz
 
 echo "++ Scaling data post volreg"
-echo "++ ------------------------"
+echo "++ ========================"
 for EC in e01 e02 e03
 do
     echo " + scaling [${EC}]"
@@ -59,27 +59,61 @@ do
 done
 
 echo "++ Compute GS in two different ways for each echo separately post volreg & scaling"
-echo "++ -------------------------------------------------------------------------------"
+echo "++ ==============================================================================="
 for EC in e01 e02 e03
 do
     # Global regression with no detrending prior to computing GS
     3dROIstats -quiet \
                -mask mask_tedana_at_least_one_echo.nii.gz \
                 pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc.HEAD | awk '{print $1}' > pb03.${SBJ}.r01.${EC}.volreg.scale.GSasis.1D
-    
-#    # Alternative GS regression computing GS post detrending           
-#    3dDetrend -overwrite \
-#              -polort 5 \
-#              -prefix pb03.${SBJ}.r01.${EC}.volreg.scale.dt5 \
-#                      pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc
-#    3dROIstats -quiet \
-#               -mask mask_tedana_at_least_one_echo.nii.gz \
-#               pb03.${SBJ}.r01.${EC}.volreg.scale.dt5+tlrc.HEAD | awk '{print $1}' > pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D
-#    rm pb03.${SBJ}.r01.${EC}.volreg.scale.dt5+tlrc.*
 done
 
 echo "++ Denoising each echo separately (Basic & GS Pipelines)"
-echo "++ ------------------------------------------------------"
+echo "++ ====================================================="
+
+# NOTE: Afni_proc computes CompCorre regressors based on OC data, which can be influenced by whether or not NORDIC is in place (e.g., S0 and t2s maps can differ)
+# To avoid this, we need to compute our own CompCorr regressors independently of NORDIC --> compute them on each echo --> create a GLM matrix per echo, not use the one for afni_proc.py
+
+echo "++ 1. Computing CompCorr regressors per echo...."
+echo "++ ---------------------------------------------"
+tr_counts=`3dinfo -nt pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc`
+# Create Echo Specific CompCorr regressors
+for EC in e01 e02 e03
+do
+    # to censor, create per-run censor files
+    1d_tool.py -overwrite -set_run_lengths ${tr_counts} -select_runs 01 -infile censor_${SBJ}_combined_2.1D -write rm.censor.${EC}.r01.1D
+    # do not let censored time points affect detrending
+    3dTproject -overwrite -polort 5 -prefix rm.det_pcin_${EC}_r01 -censor rm.censor.${EC}.r01.1D -cenmode KILL -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc
+    # make ROI PCs (per run) : FSvent
+    3dpc -overwrite -mask follow_ROI_FSvent+tlrc -pcsave 3 -prefix rm.ROIPC.FSvent.${EC}.r01 rm.det_pcin_${EC}_r01+tlrc
+    # zero pad censored TRs and further pad to fill across all runs
+    1d_tool.py -overwrite -censor_fill_parent rm.censor.${EC}.r01.1D -infile rm.ROIPC.FSvent.${EC}.r01_vec.1D  -write - | 1d_tool.py -overwrite -set_run_lengths ${tr_counts} -pad_into_many_runs 01 1 -infile - -write ROIPC.FSvent.${EC}.r01.1D
+done
+
+echo "++ 2. Create GLM matrix per-echo for later use in 3dTproject..."
+echo "++ ------------------------------------------------------------"
+# Create GLM matrix per-echo
+for EC in e01 e02 e03
+do
+    3dDeconvolve -overwrite                                                   \
+        -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc.HEAD                   \
+        -censor censor_${SBJ}_combined_2.1D                                   \
+        -ortvec bandpass_rall.1D bandpass                                     \
+        -ortvec ROIPC.FSvent.${EC}.r01.1D ROIPC.FSvent.r01                    \
+        -ortvec mot_demean.r01.1D mot_demean_r01                              \
+        -ortvec mot_deriv.r01.1D mot_deriv_r01                                \
+        -polort 5                                                             \
+        -num_stimts 0                                                         \
+        -jobs 32                                                              \
+        -fout -tout -x1D X.xmat.${EC}.1D -xjpeg X.${EC}.jpg                   \
+        -x1D_uncensored X.nocensor.xmat.${EC}.1D                              \
+        -fitts fitts.${EC}.${SBJ}                                             \
+        -errts errts.${EC}.${SBJ}                                             \
+        -x1D_stop                                                             \
+        -cbucket all_betas.${EC}.${SBJ}                                       \
+        -bucket stats.${EC}.${SBJ}
+done
+
 
 # First we will do this with the different interpolation schemes
 for EC in e01 e02 e03
@@ -92,7 +126,7 @@ do
                -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                               \
                -censor censor_${SBJ}_combined_2.1D                                          \
                -cenmode ${INTERP_MODE}                                                      \
-               -ort X.nocensor.xmat.1D                                                      \
+               -ort X.nocensor.xmat.${EC}.1D                                                \
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic    \
                -mask mask_tedana_at_least_one_echo.nii.gz
     echo " + Denoising echo [${EC} | ${INTERP_MODE}] | GSasis"
@@ -101,20 +135,10 @@ do
                -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                             \
                -censor censor_${SBJ}_combined_2.1D                                        \
                -cenmode ${INTERP_MODE}                                                    \
-               -ort X.nocensor.xmat.1D                                                    \
+               -ort X.nocensor.xmat.${EC}.1D                                              \
                -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSasis.1D                          \
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis \
                -mask mask_tedana_at_least_one_echo.nii.gz
-    echo " + Denoising echo [${EC} | ${INTERP_MODE}] | GSdt5"
-#    3dTproject -overwrite                                                                 \
-#               -polort 0                                                                  \
-#               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                             \
-#               -censor censor_${SBJ}_combined_2.1D                                        \
-#               -cenmode ${INTERP_MODE}                                                    \
-#               -ort X.nocensor.xmat.1D                                                    \
-#               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D                           \
-#               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5  \
-#               -mask mask_tedana_at_least_one_echo.nii.gz
   done
 done
 
@@ -125,25 +149,17 @@ do
    3dTproject -overwrite                                                              \
                -polort 0                                                              \
                -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
-               -ort X.nocensor.xmat.1D                                                \
+               -ort X.nocensor.xmat.${EC}.1D                                          \
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_Basic         \
                -mask mask_tedana_at_least_one_echo.nii.gz
     echo " + Denoising echo [${EC} | ALL] | GSasis"
     3dTproject -overwrite                                                             \
                -polort 0                                                              \
                -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
-               -ort X.nocensor.xmat.1D                                                \
+               -ort X.nocensor.xmat.${EC}.1D                                          \
                -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSasis.1D                      \
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_GSasis        \
                -mask mask_tedana_at_least_one_echo.nii.gz
-#    echo " + Denoising echo [${EC} | ALL] | GSdt5"
-#    3dTproject -overwrite                                                             \
-#               -polort 0                                                              \
-#               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
-#               -ort X.nocensor.xmat.1D                                                \
-#               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSdt5.1D                       \
-#               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_GSdt5         \
-#               -mask mask_tedana_at_least_one_echo.nii.gz
 done
 
 # Extract ROI Timeseries
@@ -178,30 +194,13 @@ do
     3dROIstats -quiet                                                                                   \
                -mask ${ATLAS_PATH}                                                                      \
                errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}_000.netts
-
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ## echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR (dt5) ]"
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ## 3dNetCorr -overwrite                                                                               \
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##           -mask mask_tedana_at_least_one_echo.nii.gz                                               \
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##           -in_rois ${ATLAS_PATH}                                                                   \
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##           -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc          \
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##           -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}
-
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ## 3dROIstats -quiet \
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##            -mask ${ATLAS_PATH} \
-    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##            errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}_000.netts
-
   done
 done
 
 # Remove all the versions of GS
-#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ALL_GSasis+tlrc.*
-#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ALL_GSdt5+tlrc.*
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GSasis+tlrc.*
-#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GSdt5+tlrc.*
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_GSasis+tlrc.*
-#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_GSdt5+tlrc.*
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL_GSasis+tlrc.*
-#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL_GSdt5+tlrc.*
 
 # Remove the denoised data without GS regression
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_Basic+tlrc.*

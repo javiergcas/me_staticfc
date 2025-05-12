@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.16.1
 #   kernelspec:
 #     display_name: BOLD WAVES 2024a
 #     language: python
@@ -28,7 +28,7 @@ from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR
 from sfim_lib.plotting.fc_matrices import hvplot_fc
 from itertools import combinations_with_replacement, combinations
-ATLAS_NAME = 'Power264'
+ATLAS_NAME = 'Power264_GatingDataset'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 import panel as pn
 pn.extension()
@@ -52,7 +52,7 @@ pairs_of_echo_pairs = ['|'.join((e_x[0],e_x[1]))+'_vs_'+'|'.join((e_y[0],e_y[1])
 print('Echo Pairs[n=%d]=%s' %(len(echo_pairs),str(echo_pairs)))
 print('Pairs of Echo Pairs[n=%d]=%s' %(len(pairs_of_echo_pairs),str(pairs_of_echo_pairs)))
 
-echo_times_dict = {'e01':13.7,'e02':30.0, 'e03':47.0}
+echo_times_dict = {'e01':13.9,'e02':31.7, 'e03':49.5}
 
 # Pick a subjec and scan as representatives for the purpose of generating the figures
 
@@ -64,9 +64,9 @@ echo_times_dict = {'e01':13.7,'e02':30.0, 'e03':47.0}
 # Sample scans
 #good_scan = ('sub-211','ses-2') #('sub-94', 'ses-2')
 #bad_scan  = ('sub-03', 'ses-2')
-good_scan = ('MGSBJ06','constant_gated') #('sub-94', 'ses-2')
-bad_scan  = ('MGSBJ06', 'cardiac_gated')
-sample_scans = [good_scan, bad_scan]
+good_scan = ('MGSBJ07','constant_gated') #('sub-94', 'ses-2')
+bad_scan  = ('MGSBJ07', 'cardiac_gated')
+sample_scans = [good_scan, bad_scan, ('MGSBJ05','constant_gated')]
 sample_scans_select = {'constant gating':good_scan, 'cardiac gating':bad_scan}
 
 # # 1. Load Atlas Information
@@ -130,10 +130,10 @@ def plot_matrix(scan,scenario,fc_metric='R',echo_pair=('e02','e02'), title=''):
     return plot
 @pn.depends(scan_select,scenarioA_select)
 def plot_left_matrix(scan,scenario):
-    return plot_matrix(scan,scenario, title='Scenario B')
+    return plot_matrix(scan,scenario, title='Scenario B: '+ scenario)
 @pn.depends(scan_select,scenarioB_select)
 def plot_right_matrix(scan,scenario):
-    return plot_matrix(scan,scenario, title='Scenario A')   
+    return plot_matrix(scan,scenario, title='Scenario A:' + scenario)   
 
 
 dashboard = pn.Row(conf_card,plot_left_matrix, plot_right_matrix)
@@ -320,12 +320,12 @@ plots
 
 # +
 zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
-a = sym_matrix_to_vec(fc['R','ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
+a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
 b = a + 0.1 * (np.random.rand(20503) - .5)
 df = pd.DataFrame([a,b], index=['FC-R (TE1,TE2)','FC-R (TE1,TE3)']).T
 plot_simulation = df.hvplot.scatter(x='FC-R (TE1,TE2)',y='FC-R (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-R (TEi,TEj)', ylabel='FC-R (TEk,TEl)').opts(fontscale=1.5, title='Simulated behavior for FC-R') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
 
-c = sym_matrix_to_vec(fc['R','ALL_Tedana',('e01','e03')].values,discard_diagonal=True)
+c = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e01','e03')].values,discard_diagonal=True)
 df = pd.DataFrame([a,c], index=['FC-R (TE1,TE2)','FC-R (TE1,TE3)']).T
 plot_real_data = df.hvplot.scatter(x='FC-R (TE1,TE2)',y='FC-R (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-R (TE1,TE2)', ylabel='FC-R (TE1,TE3)').opts(fontscale=1.5, title='Empirical data') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
 
@@ -337,12 +337,12 @@ and the represenative data on the right shows this behavior in the form of a sca
 As FC-R is expected to be echo independent, data sits approximately on the identity line (Slope=1, Intercept=0) plot_simulation + plot_real_data""", width=800)
 
 output = pn.Column(header,plot_simulation + plot_real_data)
-output.save('../../results/FCR_theoretical_behavior_across_echoes.html')
+#output.save('../../results/FCR_theoretical_behavior_across_echoes.html')
 output
 
 # +
-a = sym_matrix_to_vec(fc['C','ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C','ALL_Tedana',('e02','e03')].values,discard_diagonal=True)
+a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
+b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana',('e02','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -352,7 +352,7 @@ plot_simulation = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspec
                   hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
                   zero_marker
 
-c = sym_matrix_to_vec(fc['C','ALL_Tedana',('e01','e03')].values,discard_diagonal=True)
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana',('e01','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e01']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE1,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -406,8 +406,8 @@ def variance_explained(x, y, degree):
 variance_explained(df[df.columns[0]],df[df.columns[1]],2)
 
 # +
-a = sym_matrix_to_vec(fc['C','ALL_Basic',('e01','e02')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C','ALL_Basic',('e02','e03')].values,discard_diagonal=True)
+a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e01','e02')].values,discard_diagonal=True)
+b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e02','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -418,7 +418,7 @@ plot_simulation = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspec
                   hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
                   zero_marker
 
-c = sym_matrix_to_vec(fc['C','ALL_Basic',('e01','e03')].values,discard_diagonal=True)
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e01','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e01']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE1,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -437,8 +437,8 @@ output.save('../../results/FCC_theoretical_behavior_across_echoes.html')
 output
 
 # +
-a = sym_matrix_to_vec(fc['C','ALL_GSasis',('e01','e02')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C','ALL_GSasis',('e02','e03')].values,discard_diagonal=True)
+a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GSasis',('e01','e02')].values,discard_diagonal=True)
+b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GSasis',('e02','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -449,7 +449,7 @@ plot_simulation = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspec
                   hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
                   zero_marker
 
-c = sym_matrix_to_vec(fc['C','ALL_GSasis',('e01','e03')].values,discard_diagonal=True)
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GSasis',('e01','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e01']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE1,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -570,13 +570,53 @@ print(r1,r2,r3)
 #
 # $$COV(s_{x,i},s_{y,j})=\frac{1}{N_{t}} \cdot \sum_t (\Delta\rho(x,t)-\Delta R_2^*(x,t)\cdot TE_i) \cdot (\Delta\rho(y,t)-\Delta R_2^*(y,t)\cdot TE_j)\tag{7}$$
 
-a = sym_matrix_to_vec(fc['R','Advanced',('e02','e02')].values,discard_diagonal=True)
+a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e02','e02')].values,discard_diagonal=True)
 b = a + 0.1 * (np.random.rand(20503) - .5)
 df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 c = 2.3*a + 0.1 * (np.random.rand(20503) - .5)
 df2 = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)').opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3) * \
 df2.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True).opts(fontscale=1.5) * hv.Slope(2.3,0).opts(line_color='g',line_dash='dashed',line_width=3)
+
+a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e02','e02')].values,discard_diagonal=True)
+b = a + 0.1 * (np.random.rand(20503) - .5)
+df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
+c = 2.3*a + 0.1 * (np.random.rand(20503) - .5)
+df2 = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
+pn.Row(df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)', xlim=(-.4,1.6), ylim=(-.4,1.6)).opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3),
+df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)', xlim=(-.4,1.6), ylim=(-.4,1.6)).opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3) * \
+df2.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True).opts(fontscale=1.5) * hv.Slope(2.3,0).opts(line_color='g',line_dash='dashed',line_width=3))
+
+from nilearn.connectome import sym_matrix_to_vec
+
+x =  sym_matrix_to_vec(fc['R','MGSBJ05','constant_gated','ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
+y =  sym_matrix_to_vec(fc['R','MGSBJ05','constant_gated','ALL_Tedana',('e03','e03')].values,discard_diagonal=True)
+
+fc.keys()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # # 6. Plot used to describe de DBOLD metric in the abstract
 

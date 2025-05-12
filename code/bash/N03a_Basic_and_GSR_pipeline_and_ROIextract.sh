@@ -1,3 +1,4 @@
+#!/bin/bash
 # 10/22/2024 - Javier Gonzalez-Castillo
 #
 # This script will do teh regression of common nuisances in the volreg and extract
@@ -12,7 +13,18 @@ PRJDIR='/data/SFIMJGC_HCP7T/BCBL2024/'
 PRCS_DATA_DIR=`echo ${PRJDIR}/prcs_data`
 
 SBJ_DIR=`echo ${PRCS_DATA_DIR}/${SBJ}`
-FMRI_DATA_DIR=`echo ${SBJ_DIR}/D02_Preproc_fMRI_${SES}`
+
+# Trick to pick results for NORDIC pipeline without having to re-write other notebooks
+if [[ -z ${AFNIPROC_OUTDIR} ]]; then
+   echo "++ WARNING: Variable {AFNIPROC_OUTDIR} not provided --> setting FMRI_DATA_DIR to default value"
+   FMRI_DATA_DIR=`echo ${SBJ_DIR}/D02_Preproc_fMRI_${SES}`
+   echo "            FMRI_DATA_DIR=${FMRI_DATA_DIR}"
+else
+   FMRI_DATA_DIR=`echo ${AFNIPROC_OUTDIR}/`
+   echo "++ INFO: Setting FMRI_DATA_DIR=${FMRI_DATA_DIR} as provided via AFNIPROC_OUTDIR"
+fi
+# End of trick
+
 ATLAS_PATH=`echo ${ATLASES_DIR}/${ATLAS_NAME}/${ATLAS_NAME}.nii.gz`
 
 echo "++ Working on Subject ${SBJ}/${SES}... post afni proc"
@@ -28,6 +40,7 @@ echo "++ Entering FMRI_DATA_DIR"
 echo "========================="
 cd ${FMRI_DATA_DIR}
 echo " +  `pwd`"
+ln -fs ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ${FMRI_DATA_DIR}/mask_tedana_at_least_one_echo.nii.gz
 
 echo "++ Scaling data post volreg"
 echo "++ ------------------------"
@@ -142,9 +155,11 @@ do
   for INTERP_MODE in ZERO KILL NTRP ALL
   do
     echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising]"
-    3dNetCorr -overwrite                                                                          \
-              -mask mask_tedana_at_least_one_echo.nii.gz                                          \
-              -in_rois ${ATLAS_PATH}                                                              \
+    echo "3dNetCorr -overwrite -mask mask_tedana_at_least_one_echo.nii.gz -in_rois ${ATLAS_PATH} -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}"
+    3dNetCorr -overwrite                                                                                \
+              -push_thru_many_zeros                                                                     \
+              -mask mask_tedana_at_least_one_echo.nii.gz                                                \
+              -in_rois ${ATLAS_PATH}                                                                    \
               -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc            \
               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}
 
@@ -153,32 +168,33 @@ do
                errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}_000.netts
 
     echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR (asis) ]"
-    3dNetCorr -overwrite                                                                               \
-              -mask mask_tedana_at_least_one_echo.nii.gz                                               \
-              -in_rois ${ATLAS_PATH}                                                                   \
-              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis+tlrc          \
+    3dNetCorr -overwrite                                                                                \
+              -push_thru_many_zeros                                                                     \
+              -mask mask_tedana_at_least_one_echo.nii.gz                                                \
+              -in_rois ${ATLAS_PATH}                                                                    \
+              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis+tlrc           \
               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}
 
-    3dROIstats -quiet \
-               -mask ${ATLAS_PATH} \
+    3dROIstats -quiet                                                                                   \
+               -mask ${ATLAS_PATH}                                                                      \
                errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}_000.netts
 
-#    echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR (dt5) ]"
-#    3dNetCorr -overwrite                                                                               \
-#              -mask mask_tedana_at_least_one_echo.nii.gz                                               \
-#              -in_rois ${ATLAS_PATH}                                                                   \
-#              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc          \
-#              -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}
-#
-#    3dROIstats -quiet \
-#               -mask ${ATLAS_PATH} \
-#               errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc > #errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}_000.netts
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ## echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR (dt5) ]"
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ## 3dNetCorr -overwrite                                                                               \
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##           -mask mask_tedana_at_least_one_echo.nii.gz                                               \
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##           -in_rois ${ATLAS_PATH}                                                                   \
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##           -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc          \
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##           -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}
+
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ## 3dROIstats -quiet \
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##            -mask ${ATLAS_PATH} \
+    ## MAY 2025 - NO LONGER NEEDED - NOT THIS TYPE OF GS ##            errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSdt5.${ATLAS_NAME}_000.netts
 
   done
 done
 
 # Remove all the versions of GS
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ALL_GSasis+tlrc.*
+#rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ALL_GSasis+tlrc.*
 #rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ALL_GSdt5+tlrc.*
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GSasis+tlrc.*
 #rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GSdt5+tlrc.*

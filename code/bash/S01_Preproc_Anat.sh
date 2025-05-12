@@ -1,4 +1,4 @@
-# 11/10/2020 - Isabel Fernandez
+# 11/10/2025 - Javier Gonzalez-Castillo
 #
 # This script runs @SSwarper on each individual subjects
 #
@@ -7,8 +7,15 @@
 # 1) It assumes Freesurfer was run, and uses one of its outputs as input
 # 2) Input is brain.finalsurfs.nii.gz, which is already skull-stripped
 #
-export OMP_NUM_THREADS=32
 set -e
+
+OMP_NUM_THREADS=${SLURM_CPUS_ON_NODE}
+# check available N_threads and report what is being used
+nthr_avail=`afni_system_check.py -disp_num_cpu`
+nthr_using=`afni_check_omp`
+
+echo "++ INFO: OMP_NUM_THREADS=${OMP_NUM_THREADS}"
+echo "++ INFO: Using ${nthr_using} of available ${nthr_avail} threads"
 
 PRJDIR='/data/SFIMJGC_HCP7T/BCBL2024/'
 PRCS_DATA_DIR=`echo ${PRJDIR}/prcs_data`

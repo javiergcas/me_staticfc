@@ -11,7 +11,25 @@ PRJDIR='/data/SFIMJGC_HCP7T/BCBL2024/'
 PRCS_DATA_DIR=`echo ${PRJDIR}/prcs_data`
 
 SBJ_DIR=`echo ${PRCS_DATA_DIR}/${SBJ}`
-FMRI_DATA_DIR=`echo ${SBJ_DIR}/D02_Preproc_fMRI_${SES}`
+
+# Trick to pick results for NORDIC pipeline without having to re-write other notebooks
+if [[ -z ${AFNIPROC_OUTDIR} ]]; then
+   echo "++ WARNING: Variable {AFNIPROC_OUTDIR} not provided --> setting FMRI_DATA_DIR to default value"
+   FMRI_DATA_DIR=`echo ${SBJ_DIR}/D02_Preproc_fMRI_${SES}`
+   echo "            FMRI_DATA_DIR=${FMRI_DATA_DIR}"
+else
+   FMRI_DATA_DIR=`echo ${AFNIPROC_OUTDIR}/`
+   echo "++ INFO: Setting FMRI_DATA_DIR=${FMRI_DATA_DIR} as provided via AFNIPROC_OUTDIR"
+   # As we want to use exactly the same FOV mask, we link to that created earlier for the non-NORDIC pipeline
+   if [ -L ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ] && [ -e ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ] ; then
+      echo "++ INFO: Link to ME mask already exists."
+   else
+      echo "++ INFO: Creating link to ME mask from non-NORDIC pipeline"
+      ln -fs ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ${FMRI_DATA_DIR}/mask_tedana_at_least_one_echo.nii.gz
+   fi
+fi
+# End of trick
+
 ATLAS_PATH=`echo ${ATLASES_DIR}/${ATLAS_NAME}/${ATLAS_NAME}.nii.gz`
 
 echo "++ Working on Subject ${SBJ}/${SES}... post afni proc"
@@ -156,7 +174,7 @@ do
     for SCENARIO in Tedana TedanaGSasis
        do
        echo " + Extracting ROI Timeseries and connectivity for [${EC}]"
-       3dNetCorr -overwrite                                                                                    \
+       3dNetCorr -overwrite -push_thru_many_zeros                                                                                   \
                  -mask mask_tedana_at_least_one_echo.nii.gz                                                    \
                  -in_rois ${ATLAS_PATH}                                                                        \
                  -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_${SCENARIO}+tlrc          \

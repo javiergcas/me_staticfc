@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.16.1
 #   kernelspec:
 #     display_name: BOLD WAVES 2024a
 #     language: python
@@ -109,6 +109,10 @@ report_keepers_df.head(5)
 
 good_scan_ids = list(report_keepers_df['infile'])
 print("++ Number of selected scans: %d scans" % len(good_scan_ids))
+
+print("++ Number of subjects: %d subjects" % np.unique([row['infile'].split('/')[1] for r,row in report_keepers_df.iterrows()]).shape[0])
+
+report_keepers_df.head(1)
 
 # # 3. Check motion
 

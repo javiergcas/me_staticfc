@@ -92,6 +92,12 @@ def get_fc_matrix(data, qa_xr, sbj, ses, pp, nordic, fc_metric, echo_pair='e02|e
     """
     Get an hvplot-based FC matrix
     """
+    # Set Title in colorbar
+    if fc_metric == 'R':
+        cbar_title = "Pearson's Correlation:"
+    elif fc_metric == 'C':
+        cbar_title = "Covariance:"
+    # Set Color Limits
     if ax_lim is None:
         if fc_metric == 'R':
             clim = (-.8,.8)
@@ -99,8 +105,10 @@ def get_fc_matrix(data, qa_xr, sbj, ses, pp, nordic, fc_metric, echo_pair='e02|e
             clim = (-.5,.5)
     else:
         clim = (-ax_lim, ax_lim)
-    
+        
+    # Gather FC for this particular set of parameters (e.g., sbj, ses, pp, etc...)
     fc_matrix = data[sbj,ses,pp,nordic,echo_pair,fc_metric]
+    # Gather pBOLD for this particular set of parameters
     fc_pBOLD  = qa_xr.sel(sbj=sbj,ses=ses,pp=pp,qc_metric='pBOLD',fc_metric=fc_metric).mean().values
 
     if title is None:
@@ -108,7 +116,7 @@ def get_fc_matrix(data, qa_xr, sbj, ses, pp, nordic, fc_metric, echo_pair='e02|e
         
     fc_plot   = hvplot_fc(fc_matrix, 
                           major_label_overrides='regular_grid', net_cmap=net_cmap,
-                          cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left', clim=clim,
+                          cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left', clim=clim, cbar_title=cbar_title,
                           cbar_title_fontsize=14,ticks_font_size=14).opts(default_tools=["pan"]).opts(title=title)
     return fc_plot
     
@@ -191,59 +199,59 @@ def dynamic_summary_plot_gated(qa_xr, fc_metric, qc_metric, nordic):
     df['Scenario'] = df['Session']+'\n'+df['Pre-processing']
 
     plot = df.hvplot.box(   by='Scenario',y=qc_metric, legend=False) * \
-           df.hvplot.scatter(x='Scenario',y=qc_metric, by='Subject') * \
+           df.hvplot.scatter(x='Scenario',y=qc_metric, by='Subject', legend=False, hover_cols=['Subject','Session']) * \
            df.hvplot.line(by=['Subject','Session'],x='Scenario',y=qc_metric, legend=False, c='k', line_dash='dashed', line_width=0.5)
     return plot.opts(legend_position='top', height=400, width=600, legend_cols=4)
 
-def get_hv_box_discoveryset(qa_xr, qc_metric, fc_metric='C', NORDIC=False):
-    """
-    Create Dynamic Group Level Bar plots for a given quality metric
-
-    This only applies to the Discovery Set
-    """
-    if NORDIC:
-        pp=['ALL_Basic_NORDIC','ALL_GSasis_NORDIC','ALL_Tedana_NORDIC']
-        title='NORDIC ON'
-    else:
-        title='NORDIC OFF'
-        pp=['ALL_Basic','ALL_GSasis','ALL_Tedana']
-    df= qa_xr.sel(fc_metric=fc_metric, qc_metric=qc_metric, pp=pp).mean(dim='ee_vs_ee').to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
-    df.columns=['Subject','Session','Pre-processing',qc_metric]
-    df = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana', 'ALL_Basic_NORDIC':'Basic','ALL_GSasis_NORDIC':'GSR','ALL_Tedana_NORDIC':'Tedana'})
+#def get_hv_box_discoveryset(qa_xr, qc_metric, fc_metric='C', NORDIC=False):
+#    """
+#    Create Dynamic Group Level Bar plots for a given quality metric
+#
+#    This only applies to the Discovery Set
+#    """
+#    if NORDIC:
+#        pp=['ALL_Basic_NORDIC','ALL_GSasis_NORDIC','ALL_Tedana_NORDIC']
+#        title='NORDIC ON'
+#    else:
+#        title='NORDIC OFF'
+#        pp=['ALL_Basic','ALL_GSasis','ALL_Tedana']
+#    df= qa_xr.sel(fc_metric=fc_metric, qc_metric=qc_metric, pp=pp).mean(dim='ee_vs_ee').to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+#    df.columns=['Subject','Session','Pre-processing',qc_metric]
+#    df = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana', 'ALL_Basic_NORDIC':'Basic','ALL_GSasis_NORDIC':'GSR','ALL_Tedana_NORDIC':'Tedana'})
+#    
+#    df2=df.pivot(columns=['Pre-processing'],values=qc_metric, index=['Subject','Session'])
+#    
+#    plot_box     = df.hvplot.box(legend=False, by=['Session','Pre-processing'],box_color='Pre-processing',y=qc_metric).opts(cmap=['gray','lightgray','white'], width=500, height=500,ylabel=qc_metric, fontscale=1.5, title=title)
+#    df['group'] = df['Session']+'|'+df['Pre-processing']
+#    df = df.set_index('group').loc[['cardiac_gated|Basic','cardiac_gated|GSR','cardiac_gated|Tedana','constant_gated|Basic','constant_gated|GSR','constant_gated|Tedana']].reset_index()
+#    plot_scatter = df.hvplot.scatter(legend=False, x='group',y=qc_metric,hover_cols=['Subject'],color=['Subject'],cmap=['red','green','blue','cyan','yellow','magenta','orange']).opts( width=500, height=500,ylabel=qc_metric, fontscale=1.5, #title=title, jitter=.03,xrotation=45) * \
+#                   df.hvplot.line(by=['Subject','Session'],x='group',y=qc_metric, legend=False, c='k', line_dash='dashed', line_width=0.5)
+#    return pn.Column(plot_box,plot_scatter) 
     
-    df2=df.pivot(columns=['Pre-processing'],values=qc_metric, index=['Subject','Session'])
-    
-    plot_box     = df.hvplot.box(legend=False, by=['Session','Pre-processing'],box_color='Pre-processing',y=qc_metric).opts(cmap=['gray','lightgray','white'], width=500, height=500,ylabel=qc_metric, fontscale=1.5, title=title)
-    df['group'] = df['Session']+'|'+df['Pre-processing']
-    df = df.set_index('group').loc[['cardiac_gated|Basic','cardiac_gated|GSR','cardiac_gated|Tedana','constant_gated|Basic','constant_gated|GSR','constant_gated|Tedana']].reset_index()
-    plot_scatter = df.hvplot.scatter(legend=False, x='group',y=qc_metric,hover_cols=['Subject'],color=['Subject'],cmap=['red','green','blue','cyan','yellow','magenta','orange']).opts( width=500, height=500,ylabel=qc_metric, fontscale=1.5, title=title, jitter=.03,xrotation=45) * \
-                   df.hvplot.line(by=['Subject','Session'],x='group',y=qc_metric, legend=False, c='k', line_dash='dashed', line_width=0.5)
-    return pn.Column(plot_box,plot_scatter) 
-    
-def get_hv_box(qa_xr,qc_metric, fc_metric='C', qc_metric_selector='Basic<0.6'):
-    """
-    Create Dynamic Group Level Bar plots for a given quality metric
-    It also highlights a set of selected scans
-    """
-    #def update_heatmap(x, y):
-    #    new_data = pd.DataFrame(np.random.rand(10, 10), columns=range(10), index=range(10))
-    #    return hv.Image(new_data.values).opts(cmap='viridis', colorbar=True)
-    
-    df= qa_xr.sel(fc_metric=fc_metric, qc_metric=qc_metric).mean(dim='ee_vs_ee').to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
-    df.columns=['Subject','Session','Pre-processing',qc_metric]
-    df = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana', 'ALL_Basic_NORDIC':'Basic (NORDIC)','ALL_GSasis_NORDIC':'GSR (NORDIC)','ALL_Tedana_NORDIC':'Tedana (NORDIC)'})
-
-    df2=df.pivot(columns=['Pre-processing'],values=qc_metric, index=['Subject','Session'])
-    selected_scans = list(df2.query(qc_metric_selector).index)
-
-    plot_box     = df2.hvplot.box(legend=False).opts(box_color='Pre-processing', cmap=['lightblue','orange','green'], width=500, height=500,ylabel=qc_metric, fontscale=1.5)
-    plot_scatter = df.hvplot.scatter(y=qc_metric, x='Pre-processing', c='Pre-processing', legend=False).opts(size=1,jitter=0.05)
-    #tap_stream   = hv.streams.Tap(source=plot_scatter, x=np.nan, y=np.nan)
-
-    if len(selected_scans)>0:
-        plot = plot_box * plot_scatter * df.set_index(['Subject','Session']).loc[selected_scans].hvplot.line(by=['Subject','Session'],x='Pre-processing',y=qc_metric, legend=False, c='k', line_dash='dashed', line_width=0.5)
-    else:
-        plot = plot_box * plot_scatter
-    
-    #heatmap_dmap = hv.DynamicMap(lambda x, y: update_heatmap(x, y), streams=[tap_stream])
-    return plot #pn.Column(plot,heatmap_dmap)
+#def get_hv_box(qa_xr,qc_metric, fc_metric='C', qc_metric_selector='Basic<0.6'):
+#    """
+#    Create Dynamic Group Level Bar plots for a given quality metric
+#    It also highlights a set of selected scans
+#    """
+#    #def update_heatmap(x, y):
+#    #    new_data = pd.DataFrame(np.random.rand(10, 10), columns=range(10), index=range(10))
+#    #    return hv.Image(new_data.values).opts(cmap='viridis', colorbar=True)
+#    
+#    df= qa_xr.sel(fc_metric=fc_metric, qc_metric=qc_metric).mean(dim='ee_vs_ee').to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+#    df.columns=['Subject','Session','Pre-processing',qc_metric]
+#    df = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana', 'ALL_Basic_NORDIC':'Basic (NORDIC)','ALL_GSasis_NORDIC':'GSR (NORDIC)','ALL_Tedana_NORDIC':'Tedana (NORDIC)'})
+#
+#    df2=df.pivot(columns=['Pre-processing'],values=qc_metric, index=['Subject','Session'])
+#    selected_scans = list(df2.query(qc_metric_selector).index)
+#
+#    plot_box     = df2.hvplot.box(legend=False).opts(box_color='Pre-processing', cmap=['lightblue','orange','green'], width=500, height=500,ylabel=qc_metric, fontscale=1.5)
+#    plot_scatter = df.hvplot.scatter(y=qc_metric, x='Pre-processing', c='Pre-processing', legend=False).opts(size=1,jitter=0.05)
+#    #tap_stream   = hv.streams.Tap(source=plot_scatter, x=np.nan, y=np.nan)
+#
+#    if len(selected_scans)>0:
+#        plot = plot_box * plot_scatter * df.set_index(['Subject','Session']).loc[selected_scans].hvplot.line(by=['Subject','Session'],x='Pre-processing',y=qc_metric, legend=False, c='k', line_dash='dashed', line_width=0.5)
+#    else:
+#        plot = plot_box * plot_scatter
+#    
+#    #heatmap_dmap = hv.DynamicMap(lambda x, y: update_heatmap(x, y), streams=[tap_stream])
+#    return plot #pn.Column(plot,heatmap_dmap)

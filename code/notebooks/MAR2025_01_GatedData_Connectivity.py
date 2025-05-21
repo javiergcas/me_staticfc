@@ -247,9 +247,35 @@ dashboard = template.show(port=port_tunnel)
 
 dashboard.stop()
 
-# # 
 
 # ***
+
+def dynamic_summary_plot_gated(qa_xr, fc_metric, qc_metric, nordic):
+    df= qa_xr.sel(fc_metric=fc_metric, nordic=nordic, qc_metric=qc_metric).mean(dim='ee_vs_ee').to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric','nordic'],axis=1).reset_index()
+    df.columns=['Subject','Session','Pre-processing',qc_metric]
+    df = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana', 'constant_gated':'Constant TR','cardiac_gated':'Cardiac Gated'})
+    df['Scenario'] = df['Session']+'\n'+df['Pre-processing']
+
+    plot = df.hvplot.box(   by='Scenario',y=qc_metric, legend=False) * \
+           df.hvplot.scatter(x='Scenario',y=qc_metric, by='Subject', legend=False, hover_cols=['Subject','Session']) * \
+           df.hvplot.line(by=['Subject','Session'],x='Scenario',y=qc_metric, legend=False, c='k', line_dash='dashed', line_width=0.5)
+    return plot.opts(legend_position='top', height=400, width=600, legend_cols=4)
+
+
+
+dynamic_summary_plot_gated(qa_xr, 'C', 'pBOLD', 'Off')
+
+
+
+
+
+
+
+
+
+
+
+
 
 from scipy.stats import pearsonr, spearmanr
 

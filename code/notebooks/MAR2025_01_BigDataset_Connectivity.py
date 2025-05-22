@@ -13,7 +13,7 @@
 #     name: generic_2025a
 # ---
 
-# # Description
+# # Description: Spreng Dataset - FC Results
 #
 # This notebook allow us to investigate each scan of the gated/non-gated dataset and how C and R can be used to quantify data quality
 
@@ -23,7 +23,7 @@ from bokeh.resources import INLINE
 output_notebook(INLINE)
 
 import os
-port_tunnel = int(os.environ['PORT3'])
+port_tunnel = int(os.environ['PORT2'])
 print('++ INFO: Second Port available: %d' % port_tunnel)
 
 from utils.basics import TES_MSEC, SESSIONS
@@ -34,13 +34,18 @@ import xarray as xr
 import numpy as np
 from tqdm import tqdm
 import panel as pn
-#from nilearn.connectome import sym_matrix_to_vec, vec_to_sym_matrix
-#from utils.basics import compute_residuals, softmax, echo_pairs, echo_pairs_tuples, pairs_of_echo_pairs
-#from utils.dashboard import get_all_scatters, get_fc_matrices, get_barplot, get_hv_box
 from nilearn.connectome import sym_matrix_to_vec, vec_to_sym_matrix
 from utils.basics import compute_residuals, softmax, echo_pairs, echo_pairs_tuples, pairs_of_echo_pairs
 from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_barplot, get_fc_matrix,dynamic_summary_plot_gated
 import pickle
+
+
+def reject_outliers(data, m = 2.):
+    d = np.abs(data - np.median(data))
+    mdev = np.median(d)
+    s = d/mdev if mdev else np.zeros(len(d))
+    return data[s<m]
+
 
 # ***
 
@@ -93,15 +98,11 @@ pp_opts = {'No Censoring | Basic':'ALL_Basic',
            'No Censoring | Tedana (Nc=88)':'ALL_Tedana-NORDIC_FixNComps'}
 nordic_opts = {'Do not use':'Off', 'Active':'On'}
 
-#scenarios             = ['ALL_Basic','ALL_GSasis','ALL_Tedana','ALL_Basic-NORDIC','ALL_GSasis-NORDIC','ALL_Tedana-NORDIC','ALL_Basic-NORDIC_FixNComps','ALL_GSasis-NORDIC_FixNComps','ALL_Tedana-NORDIC_FixNComps']
-#scenarios_select_dict = {'No Censoring | Basic':'ALL_Basic','No Censoring | GSR':'ALL_GSasis','No Censoring | tedana':'ALL_Tedana',
-#                        'No Censoring | Basic + NORDIC':'ALL_Basic-NORDIC','No Censoring | GSR + NORDIC':'ALL_GSasis-NORDIC','No Censoring | tedana + NORDIC':'ALL_Tedana-NORDIC',
-#                        'No Censoring | Basic + NORDIC (N=88)':'ALL_Basic-NORDIC_FixNComps','No Censoring | GSR + NORDIC (N=88)':'ALL_GSasis-NORDIC_FixNComps','No Censoring | tedana + NORDIC (N=88)':'ALL_Tedana-NORDIC_FixNComps',}
 data_fc = {}
 # -
 
 # %%time
-filename = './cache/fc_spring.pkl'
+filename = './cache/spreng_fc.pkl'
 if osp.exists(filename):
     print("++ WARNING: Loading pre-existing data from cache folder.")
     with open(filename, 'rb') as f:
@@ -142,7 +143,7 @@ else:
 sbj_list  = sorted(list((set(dataset_info_df.index.get_level_values(level='Subject')))))
 
 # %%time
-filename = './cache/qc_spring.nc'
+filename = './cache/spreng_fc_qc.nc'
 if osp.exists(filename):
     print("++ WARNING: Loading pre-existing data from cache folder.")
     qa_xr = xr.open_dataarray(filename)
@@ -184,7 +185,8 @@ else:
                             # Compute dBOLD and dSo metrics
                             qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dBOLD'] = np.sqrt((compute_residuals(data_df[eep1].values,data_df[eep2].values,BOLD_line_sl,BOLD_line_int)**2).sum())
                             qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dSo']   = np.sqrt((compute_residuals(data_df[eep1].values,data_df[eep2].values,So_line_sl,  So_line_int)**2).sum())
-            
+                            # REMOVE OUTLIERS: qa_xr.loc[sbj,ses,pp,nordic,'C',eep,'dBOLD'] = np.sqrt((reject_outliers(compute_residuals(data_df[eep1].values,data_df[eep2].values,BOLD_line_sl,BOLD_line_int),3)**2).sum())
+                            # REMOVE OUTLIERS: qa_xr.loc[sbj,ses,pp,nordic,'C',eep,'dSo']   = np.sqrt((reject_outliers(compute_residuals(data_df[eep1].values,data_df[eep2].values,So_line_sl,  So_line_int),3)**2).sum())
                             # Compute probabilities
                             qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD'], qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo'] = 1 - softmax(qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,['dBOLD','dSo']].values)
         
@@ -236,20 +238,25 @@ plot_select   = pn.widgets.Select(name='Plot type',      options={'Scatter Plot'
                                                                  'Group Results (Static)':'group_res_static', 'Group Results (Dynamic)':'group_res_dynamic'})
 
 scat_lim_input = pn.widgets.FloatInput(name='Scatter Limit Value', value=1., step=0.1, start=0., end=50., width=200)
-show_line_fit_checkbox = pn.widgets.Checkbox(name='Show Linear Fit?')
-
-
-#sbj_select  = pn.widgets.Select(name='Subject',        options=sbj_list, width=200)
-#ses_select  = pn.widgets.Select(name='Data Type',      options=ses_list, width=200)
-#pp_select    = pn.widgets.Select(name='Pre-processing', options=scenarios_select_dict, width=200)
-#fc_select    = pn.widgets.Select(name='FC Metric',      options={'Correlation':'R','Covariance':'C'}, width=200)
-#plot_select  = pn.widgets.Select(name='Plot type',      options={'Scatter Plot':'scatter','Hex Bin':'hexbin','FC Matrices across pipelines (NORIC Off)':'FCmats',
-#                                                                 'Group Results (Static)':'group_res_static', 'Group Results (Dynamic)':'group_res_dynamic'})
 #show_line_fit_checkbox = pn.widgets.Checkbox(name='Show Linear Fit?')
+show_line_fit_checkbox = pn.widgets.Toggle(name='Show Linear Fit', button_type='primary')
+scatter_extra_confs_card = pn.Card(scat_lim_input,show_line_fit_checkbox, title='Scatter Plot & FCs | Configuration')
+
+show_stats_toggle = pn.widgets.Toggle(name='Show Statistical Annotations', button_type='primary')
+stat_test_select  = pn.widgets.Select(name='Statistical Test', options={'Paired T-test':'t-test_paired','Independent T-test':'t-test_ind','Mann Whitney (Ind,non-param)':'Mann-Whitney'})
+annot_type_select = pn.widgets.Select(name='Annotation Type', options={'Stars':'star','Simple Annotation':'simple','Full Annotation':'full'})
+barplot_extra_confs_card = pn.Card(show_stats_toggle,stat_test_select,annot_type_select, title='Group Results (Static) | Configuration')
+sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Divider(),
+           plot_select,pn.layout.Divider(),
+           scatter_extra_confs_card,pn.layout.Divider(),
+           barplot_extra_confs_card,
+           ]
+
+
 # -
 
-@pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input)
-def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim):
+@pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select)
+def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim,show_stats,stat_test,annot_type):
     if plot_type == 'hexbin':
         frame = fc_across_echoes_scatter_page(data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats[nordic], hexbin=True)
         return frame
@@ -267,7 +274,12 @@ def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_
             layout.append(fcR)
         return layout
     if plot_type == 'group_res_static':
-        return pn.Row(get_barplot(qa_xr,nordic, fc_metric,'pBOLD'),get_barplot(qa_xr,nordic,fc_metric,'dBOLD'),get_barplot(qa_xr,nordic,fc_metric,'dSo'))
+        a = pn.Card(get_barplot(qa_xr,nordic,fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),title='Results of Speng Sample (1)')
+        b = pn.Card(get_barplot(qa_xr,nordic,fc_metric,'pBOLD',  x='Pre-processing',hue='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),title='Results of Speng Sample (2)')
+        return pn.Row(a,b)
+        #return pn.Row(get_barplot(qa_xr,nordic,fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type),
+        #              get_barplot(qa_xr,nordic,fc_metric, 'dBOLD', hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type),
+        #              get_barplot(qa_xr,nordic,fc_metric, 'dSo',   hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type))
     if plot_type == 'group_res_dynamic':
         if fc_metric == 'C':
             pBOLD_card = pn.Card(dynamic_summary_plot_gated(qa_xr, fc_metric, 'pBOLD', nordic),title='pBOLD')
@@ -280,7 +292,7 @@ def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_
 
 
 template = pn.template.BootstrapTemplate(title='Gating Dataset | Edge-based Results', 
-                                         sidebar=[sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Divider(),plot_select,pn.layout.Divider(),pn.Card(scat_lim_input,show_line_fit_checkbox, title='Scatter Configuration')],
+                                         sidebar=sidebar,
                                          main=get_main_frame)
 
 dashboard = template.show(port=port_tunnel)

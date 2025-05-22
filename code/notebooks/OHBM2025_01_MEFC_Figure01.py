@@ -13,7 +13,7 @@
 #     name: bold_waves_2024a
 # ---
 
-# # Description
+# # Description: Create figures to explain the logic behing pBOLD
 #
 # This notebook creates FC matrices and scatter plots for a representative subject. These figures are intended to help explain the goals of the project. They do not represent group-level results over which to draw final conclusions
 #
@@ -57,14 +57,7 @@ echo_times_dict = {'e01':13.9,'e02':31.7, 'e03':49.5}
 # Pick a subjec and scan as representatives for the purpose of generating the figures
 
 # Representative scan used when submitting the abstract to OHBM 2025
-#sbj='sub-156'
-#ses='ses-2'
-#sbj='sub-211'
-#ses='ses-2'
-# Sample scans
-#good_scan = ('sub-211','ses-2') #('sub-94', 'ses-2')
-#bad_scan  = ('sub-03', 'ses-2')
-good_scan = ('MGSBJ07','constant_gated') #('sub-94', 'ses-2')
+good_scan = ('MGSBJ07','constant_gated')
 bad_scan  = ('MGSBJ07', 'cardiac_gated')
 sample_scans = [good_scan, bad_scan, ('MGSBJ05','constant_gated')]
 sample_scans_select = {'constant gating':good_scan, 'cardiac gating':bad_scan}
@@ -141,6 +134,8 @@ dashboard = pn.Row(conf_card,plot_left_matrix, plot_right_matrix)
 dashboard_server = dashboard.show(port=port_tunnel)
 
 dashboard_server.stop()
+
+# ***
 
 hvplot_fc(fc['R',bad_scan[0],bad_scan[1],'ALL_Basic',('e02','e02')],
           major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
@@ -316,12 +311,11 @@ plots
 # -
 
 # ***
-# # EXTRA CODE BELOW AS OF Feb.25th 2025
 
 # +
 zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
 a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
-b = a + 0.1 * (np.random.rand(20503) - .5)
+b = a + 0.1 * (np.random.rand(25425) - .5)
 df = pd.DataFrame([a,b], index=['FC-R (TE1,TE2)','FC-R (TE1,TE3)']).T
 plot_simulation = df.hvplot.scatter(x='FC-R (TE1,TE2)',y='FC-R (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-R (TEi,TEj)', ylabel='FC-R (TEk,TEl)').opts(fontscale=1.5, title='Simulated behavior for FC-R') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
 
@@ -370,73 +364,6 @@ output.save('../../results/FCC_theoretical_behavior_across_echoes.html')
 output
 
 # +
-import numpy as np
-
-def variance_explained(x, y, degree):
-    """
-    Calculates the variance explained (R^2) by a polynomial fit.
-
-    Args:
-        x (array-like): Independent variable data.
-        y (array-like): Dependent variable data.
-        degree (int): Degree of the polynomial to fit.
-
-    Returns:
-        float: The variance explained (R^2), ranging from 0 to 1.
-               Values closer to 1 indicate a better fit.
-    """
-    # Fit the polynomial
-    coeffs = np.polyfit(x, y, degree)
-    p = np.poly1d(coeffs)
-    # Calculate the total sum of squares (SST)
-    y_mean = np.mean(y)
-    sst = np.sum((y - y_mean)**2)
-
-    # Calculate the sum of squared residuals (SSR)
-    ssr = np.sum((y - p(x))**2)
-
-    # Calculate R-squared
-    r_squared = 1 - (ssr / sst)
-
-    return r_squared,coeffs
-
-
-# -
-
-variance_explained(df[df.columns[0]],df[df.columns[1]],2)
-
-# +
-a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e01','e02')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e02','e03')].values,discard_diagonal=True)
-theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
-df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
-
-plot_simulation = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-C (TE1,TE2)', ylabel='FC-C (TE2,TE3)').opts(fontscale=1.5, title='First set of TE pairs', xlim=(-.1,.3), ylim=(-.1,0.3)) * \
-                  hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * \
-                  hv.Slope(theoretical_slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * \
-                  hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
-                  zero_marker
-
-c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e01','e03')].values,discard_diagonal=True)
-theoretical_slope= (echo_times_dict['e01']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
-df = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE1,TE3)']).T
-empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
-
-plot_real_data = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-C (TE1,TE2)', ylabel='FC-C (TE1,TE3)').opts(fontscale=1.5, title='Second set of TE pairs', xlim=(-.1,.3), ylim=(-.1,0.3)) * \
-                 hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * \
-                 hv.Slope(theoretical_slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * \
-                 hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
-                 zero_marker
-
-header = pn.pane.Markdown("""
-# Exmaple of how FC-C is expected to behave across echoes. \n
-""")
-output = pn.Column(header,plot_simulation + plot_real_data)
-output.save('../../results/FCC_theoretical_behavior_across_echoes.html')
-output
-
-# +
 a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GSasis',('e01','e02')].values,discard_diagonal=True)
 b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GSasis',('e02','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
@@ -470,252 +397,53 @@ output
 
 # ***
 
-echo_pairs_tuples
-
-# $$R(i,j) = \frac{\sum{(a-b*i)*(c-d*j)}}{\sqrt{\sum{(a-b*i)}^2} * \sqrt{\sum{(c-d*j)^2}}}$$
-
-47 - 13.7
-
-
-
-
-
-# +
-np.random.seed(1)
-Mx = np.random.rand(100)
-My = np.random.rand(100)
-Mx = Mx - Mx.mean()
-My = My - My.mean()
-
-Rx = np.random.rand(100)
-Ry = np.random.rand(100)
-Rx = Rx - Rx.mean()
-Ry = Ry - Ry.mean()
-
-nx = np.random.rand(100)*0.1
-ny = np.random.rand(100)*0.1
-nx = nx - nx.mean()
-ny = ny - ny.mean()
-
-TEi = 0.015
-TEj = 0.032
-
-Sxi = Mx + nx - (Rx * TEi)
-Syj = My + ny - (Ry * TEj)
-
-rSxi_Syj = np.corrcoef(Sxi,Syj)[1,0]
-rMx_My = np.corrcoef(Mx,My)[1,0]
-rnx_ny = np.corrcoef(nx,ny)[1,0]
-rRx_Ry = np.corrcoef(Rx,Ry)[1,0]
-
-vRx = np.var(Rx)
-vRy = np.var(Ry)
-
-vMx = np.var(Mx)
-vMy = np.var(My)
-
-vnx = np.var(nx)
-vny = np.var(ny)
-
-print((rMx_My + rnx_ny  + (TEi*TEj*rRx_Ry) ) / np.sqrt( np.power(rMx_My,2) + np.power(rnx_ny,2) + np.power(rRx_Ry,2)*np.power(TEi,2)*np.power(TEj,2)  ))
-
-print(((rMx_My*np.sqrt(vMx*vMy))+ (rnx_ny*np.sqrt(vnx*100*vny*100)) + (TEi*TEj*rRx_Ry*np.sqrt(vRx*vRy*100*100) )) / np.sqrt((vMx+vnx+(vRx*100*(TEi**2)))*(vMy*100+vny*100+(vRy*100*(TEj**2)))))
-print(rSxi_Syj)
-
-# -
-
-aa = rMx_My * np.sqrt(np.sum(Mx**2)*np.sum(My**2)) 
-bb = rnx_ny * np.sqrt(np.sum(nx**2)*np.sum(ny**2)) 
-cc = rRx_Ry * np.sqrt(np.sum(Rx**2)*np.sum(Ry**2))*TEi*TEj
-aa+bb+cc
-
-num = np.sum(Sxi*Syj)
-den = np.sqrt(np.sum(Sxi**2)*np.sum(Syj**2))
-print(num,den,num/den)
-print(np.corrcoef(Sxi,Syj))
-
-# +
-r1 = np.sum(a*b) / ( np.sqrt(np.sum(np.power(a,2))*np.sum(np.power(b,2))) )
-
-r2 = np.sum(a*b) / ( np.sqrt(np.sum(np.power(a,2)))*np.sqrt(np.sum(np.power(b,2))) )
-
-r3 = np.sum(a*b) / ( np.sqrt(np.sum( np.power(a,2) * np.power(b,2) )) )
-
-print(r1,r2,r3)
-# -
-
-# As such, it follows that the covariance between these two signals is
-#
-# $$COV(s_{x,i},s_{y,j})=\frac{1}{N_{t}} \cdot \sum_t (s_{x,i}-\overline{s_{x,i}}) \cdot (s_{y,j}-\overline{s_{y,j}}) \tag{3}$$
-#
-# Becuase we are working with signals in units of signal percent change, it follows that $\overline{s_{x,i}}=\overline{s_{y,j}}=0$, and equation $(3)$ can be simplified as
-#
-# $$COV(s_{x,i},s_{y,j})=\frac{1}{N_{t}} \cdot \sum_t (s_{x,i}) \cdot (s_{y,j}) \tag{4}$$
-#
-# If we incorporate the signal definitions (e.g., $(1)$ and $(2)$) into equation $(4)$, we obtain
-#
-# $$COV(s_{x,i},s_{y,j})=\frac{1}{N_{t}} \cdot \sum_t (\Delta\rho(x,t)-\Delta R_2^*(x,t)\cdot TE_i+n(x,t)) \cdot (\Delta\rho(y,t)-\Delta R_2^*(y,t)\cdot TE_j+n(y,t))\tag{5}$$
-#
-# If we expand the terms inside the summarotry, we get
-#
-# $$COV(s_{x,i},s_{y,j})=\frac{1}{N_{t}} \cdot \sum_t ( \Delta\rho(x,t) \cdot \Delta\rho(y,t) )            - ( \Delta\rho(x,t) \cdot \Delta R_2^*(y,t)\cdot TE_j ) + (\Delta\rho(x,t) \cdot n(y,t)) - \\
-#                                                     (\Delta R_2^*(x,t) \cdot TE_i \cdot \Delta\rho(y,t)) + (\Delta R_2^*(x,t)\cdot TE_i \cdot \Delta R_2^*(y,t)\cdot TE_j) - (\Delta R_2^*(x,t)\cdot TE_i \cdot n(y,t)) + \\
-#                                                     (n(x,t) \cdot \Delta\rho(y,t)) - (n(x,t) \cdot \Delta R_2^*(y,t)\cdot TE_j) + (n(x,t) \cdot n(y,t))\tag{6}$$
-#
-# Now let's explore different scenarios:
-#
-# ### Scenario 1 - Thermal noise is negligible compared to the other two type of fluctuations present in the data 
-#
-# Here, we assume that $n(x,t)<<\Delta\rho(x,t)$ and $n(x,t)<<\Delta R_2^*(x,t)*TE_{i}$. In turn, equation $(5)$ can be simplified as follows:
-#
-# $$COV(s_{x,i},s_{y,j})=\frac{1}{N_{t}} \cdot \sum_t (\Delta\rho(x,t)-\Delta R_2^*(x,t)\cdot TE_i) \cdot (\Delta\rho(y,t)-\Delta R_2^*(y,t)\cdot TE_j)\tag{7}$$
-
 a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e02','e02')].values,discard_diagonal=True)
-b = a + 0.1 * (np.random.rand(20503) - .5)
+b = a + 0.1 * (np.random.rand(25425) - .5)
 df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-c = 2.3*a + 0.1 * (np.random.rand(20503) - .5)
+c = 2.3*a + 0.1 * (np.random.rand(25425) - .5)
 df2 = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)').opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3) * \
 df2.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True).opts(fontscale=1.5) * hv.Slope(2.3,0).opts(line_color='g',line_dash='dashed',line_width=3)
 
 a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e02','e02')].values,discard_diagonal=True)
-b = a + 0.1 * (np.random.rand(20503) - .5)
+b = a + 0.1 * (np.random.rand(25425) - .5)
 df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-c = 2.3*a + 0.1 * (np.random.rand(20503) - .5)
+c = 2.3*a + 0.1 * (np.random.rand(25425) - .5)
 df2 = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 pn.Row(df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)', xlim=(-.4,1.6), ylim=(-.4,1.6)).opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3),
 df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)', xlim=(-.4,1.6), ylim=(-.4,1.6)).opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3) * \
 df2.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True).opts(fontscale=1.5) * hv.Slope(2.3,0).opts(line_color='g',line_dash='dashed',line_width=3))
 
-from nilearn.connectome import sym_matrix_to_vec
+# +
+import numpy as np
 
-x =  sym_matrix_to_vec(fc['R','MGSBJ05','constant_gated','ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
-y =  sym_matrix_to_vec(fc['R','MGSBJ05','constant_gated','ALL_Tedana',('e03','e03')].values,discard_diagonal=True)
+def variance_explained(x, y, degree):
+    """
+    Calculates the variance explained (R^2) by a polynomial fit.
 
-fc.keys()
+    Args:
+        x (array-like): Independent variable data.
+        y (array-like): Dependent variable data.
+        degree (int): Degree of the polynomial to fit.
 
+    Returns:
+        float: The variance explained (R^2), ranging from 0 to 1.
+               Values closer to 1 indicate a better fit.
+    """
+    # Fit the polynomial
+    coeffs = np.polyfit(x, y, degree)
+    p = np.poly1d(coeffs)
+    # Calculate the total sum of squares (SST)
+    y_mean = np.mean(y)
+    sst = np.sum((y - y_mean)**2)
 
+    # Calculate the sum of squared residuals (SSR)
+    ssr = np.sum((y - p(x))**2)
 
+    # Calculate R-squared
+    r_squared = 1 - (ssr / sst)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# # 6. Plot used to describe de DBOLD metric in the abstract
-
-echoes_dict = {'e01':13.7,'e02':30,'e03':47}
-
-a = sym_matrix_to_vec(fc['C','Advanced',('e01','e01')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C','Advanced',('e02','e02')].values,discard_diagonal=True)
-slope,intercept = np.polyfit(a,b,1)
-df = pd.DataFrame([a,b], index=['FC-C(TEi,TEj)','FC-C (TEk,TEl)']).T
-exp_slope = (echoes_dict['e02']**2)/(echoes_dict['e01']*echoes_dict['e01'])
-print(exp_slope)
-df.hvplot.scatter(x=df.columns[0],y='FC-C (TEk,TEl)', aspect='square',c='r',s=1, datashade=True).opts(fontscale=1.5) * \
-hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=4) * \
-hv.Slope(exp_slope,0).opts(line_color='g',line_dash='dashed',line_width=4) * \
-hv.Slope(slope,intercept).opts(line_color='b',line_dash='dashed',line_width=4) 
-
-# # 7. R-based Results
-#
-# ## 7.1 FC matrices for all 9 echo pairs
-#
-# Only two of these are used in Figure 2.A
-
-sbj='sub-156'
-ses='ses-2'
-
-fc = {}
-for (e_x,e_y) in echo_pairs_tuples:
-    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
-    roi_ts_x      = np.loadtxt(roi_ts_path_x)
-    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
-    roi_ts_y      = np.loadtxt(roi_ts_path_y)
-    aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
-    aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
-    # Compute the full correlation matrix between aux_ts_x and aux_ts_y
-    aux_r    = np.corrcoef(aux_ts_x.T, aux_ts_y.T)[:aux_ts_x.shape[1], aux_ts_x.shape[1]:]
-    aux_c    = np.cov(aux_ts_x.T, aux_ts_y.T)[:aux_ts_x.shape[1], aux_ts_x.shape[1]:]
-    fc['R','Basic',(e_x,e_y)]  = pd.DataFrame(aux_r,index=roi_idxs,columns=roi_idxs)
-    fc['C','Basic',(e_x,e_y)]  = pd.DataFrame(aux_c,index=roi_idxs,columns=roi_idxs)
-
-fc_plot_R = pn.FlexBox()
-for (e_x,e_y) in echo_pairs_tuples:
-    aux_fc = fc['R','Basic',(e_x,e_y)]
-    fc_plot_R.append(hvplot_fc(aux_fc,
-          major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
-          cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left', cbar_title="Pearson's Correlation:",cbar_title_fontsize=10,ticks_font_size=10).opts(title='%s-%s'%(e_x,e_y),default_tools=["pan"]))
-fc_plot_R
-
-# ## 7.2 Scatter across a few R-based FC matrices
-
-fc_plot_scatter_R = pn.FlexBox()
-for p in ['e01|e03_vs_e03|e03']:
-    p1 = tuple((p.split('_vs_')[1]).split('|'))
-    p2 = tuple((p.split('_vs_')[0]).split('|'))
-    aux_fc_01 = sym_matrix_to_vec(fc['R','Basic',p1].values,discard_diagonal=True)
-    aux_fc_02 = sym_matrix_to_vec(fc['R','Basic',p2].values,discard_diagonal=True)
-    aux_df = pd.DataFrame([aux_fc_01,aux_fc_02],index=p.split('_vs_')).T
-    plot = aux_df.hvplot.scatter(x=p.split('_vs_')[1],y=p.split('_vs_')[0], datashade=True,aspect='square') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=1)
-    fc_plot_scatter_R.append(plot)
-
-fc_plot_scatter_R
-
-# # 8. C-based Results
-#
-# ## 8.1 FC matrices for all 9 echo pairs
-#
-# Only two of these are used in Figure 2.B
-
-fc_plot_C = pn.FlexBox()
-for (e_x,e_y) in echo_pairs_tuples:
-    aux_fc = fc['C','Basic',(e_x,e_y)]
-    fc_plot_C.append(hvplot_fc(aux_fc,
-          major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
-          cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left', cbar_title="Covariance:",cbar_title_fontsize=10,ticks_font_size=10).opts(title='%s-%s'%(e_x,e_y),default_tools=["pan"]))
-fc_plot_C
-
-# ## 4.2 Scatter across a few C-FC matrices
-
-echoes_dict = {'e01':13.7,'e02':30,'e03':47}
-ideal_slopes = {}
-for p in pairs_of_echo_pairs:
-    x,y = p.split('_vs_')
-    x_e1,x_e2 = x.split('|')
-    y_e1,y_e2 = y.split('|')
-    ideal_slopes[p] = (echoes_dict[y_e1] * echoes_dict[y_e2]) / (echoes_dict[x_e1] * echoes_dict[x_e2])
-print(ideal_slopes)
-
-fc_plot_scatter_C = pn.FlexBox()
-for p in ['e01|e03_vs_e03|e03']:
-    p1 = tuple((p.split('_vs_')[1]).split('|'))
-    p2 = tuple((p.split('_vs_')[0]).split('|'))
-    aux_fc_01 = sym_matrix_to_vec(fc['C','Basic',p1].values,discard_diagonal=True)
-    aux_fc_02 = sym_matrix_to_vec(fc['C','Basic',p2].values,discard_diagonal=True)
-    emp_slope,emp_int = np.polyfit(aux_fc_02,aux_fc_01,1)
-    aux_df = pd.DataFrame([aux_fc_01,aux_fc_02],index=p.split('_vs_')).T
-    plot = aux_df.hvplot.scatter(x=p.split('_vs_')[1],y=p.split('_vs_')[0], datashade=True,aspect='square', xlim=(-.1,.6), ylim=(-.5,3)) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3) * \
-            hv.Slope(ideal_slopes[p],0).opts(line_color='g',line_dash='dashed',line_width=3) * \
-            hv.Slope(emp_slope,emp_int).opts(line_color='b',line_dash='dashed',line_width=3)
-    fc_plot_scatter_C.append(plot)
-
-fc_plot_scatter_C
+    return r_squared,coeffs
+# -
 
 

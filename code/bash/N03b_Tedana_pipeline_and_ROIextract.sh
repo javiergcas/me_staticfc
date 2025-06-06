@@ -1,5 +1,5 @@
 # 01/29/2025 - Javier Gonzalez-Castillo
-#
+# 06/06/2025 - JGC: Script now computes TSNR
 # This script will do the steps beyond afni_proc needed to complete the
 # (per-echo) TEDANA and TEDANA+GSR pipelines.
 #
@@ -147,6 +147,37 @@ do
                -ort pb07.${SBJ}.r01.${EC}.meica_dn.scale.GSasis.1D                    \
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_TedanaGSasis  \
                -mask mask_tedana_at_least_one_echo.nii.gz
+done
+
+echo "++ Computing Full Brain TSNR for Basic and GSasis"
+echo "================================================="
+for EC in e01 e02 e03
+do
+  for SCENARIO in ALL_Tedana
+  do
+      3dTstat -overwrite -mean -prefix rm.signal.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc
+      3dTstat -overwrite -stdev -prefix rm.noise.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}+tlrc
+      3dcalc -overwrite -a rm.signal.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii -b rm.noise.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii -expr 'a/b' -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.TSNR.nii
+      # Compute TSNR at the whole-brain level
+      compute_ROI_stats.tcsh                                                           \
+         -out_dir    tsnr_stats_regress                                                \
+         -stats_file tsnr_stats_regress/TSNR_FB_${EC}_${SCENARIO}.txt                        \
+         -dset_ROI   mask_epi_anat.${SBJ}+tlrc                                         \
+         -dset_data  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.TSNR.nii \
+         -rset_label brain                                                             \
+         -rval_list  1
+
+     # Compute TSNR at the ROI level (Same ROIs as afni_proc)
+     compute_ROI_stats.tcsh                                                            \
+         -out_dir    tsnr_stats_regress                                                \
+         -stats_file tsnr_stats_regress/TSNR_ROIs_${EC}_${SCENARIO}.txt                      \
+         -dset_ROI   ROI_import_MNI_2009c_asym_resam+tlrc                              \
+         -dset_data  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.TSNR.nii \
+         -rset_label MNI_2009c_asym                                                    \
+         -rval_list  ALL_LT
+
+     rm rm.signal.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii rm.noise.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii
+  done
 done
 
 # Extract ROI Timeseries

@@ -9,6 +9,7 @@ ATLAS_NAME    = 'Schaefer2018_400Parcels_17Networks'
 PRCS_DATA_DIR = osp.join(PRJ_DIR,'prcs_data')
 ATLASES_DIR   = osp.join(PRJ_DIR,'atlases')
 CODE_DIR      = osp.join(PRJ_DIR,'me_staticfc','code')
+SPRENG_DOWNLOAD_DIR = osp.join(PRJ_DIR,'openeuro','des003592-download')
 
 TES_MSEC = {'Gating':{'e01':13.9,'e02':31.7, 'e03':49.5},
             'Spreng_Scanner1':{'e01':13.7,'e02':30,'e03':47},
@@ -97,7 +98,7 @@ def compute_residuals(x, y, m, b):
     residuals = np.sqrt((x - x_p)**2 + (y - y_p)**2)
     return residuals
 
-def softmax(x):
+def softmax(x, substract_max=False):
   """
   Computes the softmax function for a given input vector x.
 
@@ -107,5 +108,8 @@ def softmax(x):
   Returns:
     A NumPy array representing the softmax output.
   """
-  exp_x = np.exp(x - np.max(x)) # Subtracting max(x) for numerical stability
+  if substract_max:
+      exp_x = np.exp(x - np.max(x)) # Subtracting max(x) for numerical stability
+  else:
+      exp_x = np.exp(x)
   return exp_x / np.sum(exp_x)

@@ -38,7 +38,7 @@ import matplotlib.pyplot as plt
 import panel as pn
 from nilearn.connectome import sym_matrix_to_vec, vec_to_sym_matrix
 from utils.basics import compute_residuals, softmax, echo_pairs, echo_pairs_tuples, pairs_of_echo_pairs
-from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_barplot_discovery_dataset, get_fc_matrix,dynamic_summary_plot_gated
+from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_barplot_discovery_dataset, get_fc_matrix,dynamic_summary_plot_gated, gen_scatter
 import pickle
 
 # ***
@@ -115,6 +115,20 @@ for sbj,ses in tqdm(list(dataset_info_df.index)):
                     aux_c    = np.cov(aux_ts_x.T, aux_ts_y.T)[:aux_ts_x.shape[1], aux_ts_x.shape[1]:]
                     data_fc[sbj, ses, pp,nordic,'|'.join((e_x,e_y)),'R']  = pd.DataFrame(aux_r,index=roi_idxs,columns=roi_idxs)
                     data_fc[sbj, ses, pp,nordic,'|'.join((e_x,e_y)),'C']  = pd.DataFrame(aux_c,index=roi_idxs,columns=roi_idxs)
+
+# # Motion Information
+
+motion_df = pd.DataFrame(index=dataset_info_df.index, columns=['Avg. Mot.','Max. Mot.'])
+for sbj,ses in tqdm(list(dataset_info_df.index)):
+    qc_summary_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'out.ss_review.{sbj}.txt')
+    qc_summary = pd.read_csv(qc_summary_path,sep=':', header=None)
+    qc_summary.columns = ['Metric','Value']
+    qc_summary.set_index('Metric',inplace=True)
+    qc_summary.index = [i.replace(' ','') for i in qc_summary.index]
+    motion_df.loc[(sbj,ses),'Avg. Mot.'] = float(qc_summary.loc['averagemotion(perTR)'].values[0])
+    motion_df.loc[(sbj,ses),'Max. Mot.'] = float(qc_summary.loc['maxmotiondisplacement'].values[0])
+
+motion_df.sort_values(by='Max. Mot.')
 
 # ***
 #
@@ -204,7 +218,6 @@ plot_select   = pn.widgets.Select(name='Plot type',      options={'Scatter Plot'
                                                                  'Group Results (Static)':'group_res_static', 'Group Results (Dynamic)':'group_res_dynamic'})
 
 scat_lim_input = pn.widgets.FloatInput(name='Scatter Limit Value', value=1., step=0.1, start=0., end=50., width=200)
-#show_line_fit_checkbox = pn.widgets.Checkbox(name='Show Linear Fit?')
 show_line_fit_checkbox = pn.widgets.Toggle(name='Show Linear Fit', button_type='primary')
 scatter_extra_confs_card = pn.Card(scat_lim_input,show_line_fit_checkbox, title='Scatter Plot & FCs | Configuration')
 
@@ -219,18 +232,6 @@ sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Di
            ]
 
 
-# + active=""
-# sbj_select    = pn.widgets.Select(name='Subject',        options=sbj_list, width=200)
-# ses_select    = pn.widgets.Select(name='Data Type',      options=ses_list, width=200)
-# pp_select     = pn.widgets.Select(name='Pre-processing', options=pp_opts, width=200)
-# nordic_select = pn.widgets.Select(name='NORDIC',         options=nordic_opts, width=200)
-# fc_select     = pn.widgets.Select(name='FC Metric',      options={'Correlation':'R','Covariance':'C'}, width=200)
-# plot_select   = pn.widgets.Select(name='Plot type',      options={'Scatter Plot':'scatter','Hex Bin':'hexbin','FC Matrices across pipelines':'FCmats',
-#                                                                  'FC Matrices across echoes':'FCmats_echoes',
-#                                                                  'Group Results (Static)':'group_res_static', 'Group Results (Dynamic)':'group_res_dynamic'})
-#
-# scat_lim_input = pn.widgets.FloatInput(name='Scatter Limit Value', value=1., step=0.1, start=0., end=50., width=200)
-# show_line_fit_checkbox = pn.widgets.Checkbox(name='Show Linear Fit?')
 # -
 
 @pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select)
@@ -280,6 +281,23 @@ template = pn.template.BootstrapTemplate(title='Discovery Dataset | Edge-based R
 dashboard = template.show(port=port_tunnel)
 
 dashboard.stop()
+
+# # Figures used in OHBM poster
+
+import holoviews as hv
+import hvplot
+hv.extension('matplotlib')
+plot = gen_scatter(data_fc,'MGSBJ04','constant_gated','ALL_Tedana','On','e01|e01','e03|e03','C', ax_lim=1)
+hvplot.save(plot, './saved_images/test_bold_dominated_C_example.pdf', backend='matplotlib')
+
+plot = gen_scatter(data_fc,'MGSBJ04','constant_gated','ALL_Tedana','On','e01|e01','e03|e03','R', ax_lim=1)
+hvplot.save(plot, './saved_images/test_bold_dominated_R_example.pdf', backend='matplotlib')
+
+plot = gen_scatter(data_fc,'MGSBJ02','cardiac_gated','ALL_Basic','Off','e01|e02','e02|e03','R', ax_lim=1)
+hvplot.save(plot, './saved_images/test_So_dominated_R_example.pdf', backend='matplotlib')
+
+plot = gen_scatter(data_fc,'MGSBJ02','cardiac_gated','ALL_Basic','Off','e01|e02','e02|e03','C', ax_lim=1)
+hvplot.save(plot, './saved_images/test_So_dominated_C_example.pdf', backend='matplotlib')
 
 # ***
 

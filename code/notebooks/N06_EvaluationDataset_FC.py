@@ -36,7 +36,7 @@ from tqdm import tqdm
 import panel as pn
 from nilearn.connectome import sym_matrix_to_vec, vec_to_sym_matrix
 from utils.basics import compute_residuals, softmax, echo_pairs, echo_pairs_tuples, pairs_of_echo_pairs
-from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_barplot, get_fc_matrix,dynamic_summary_plot_gated
+from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_barplot, get_fc_matrix,dynamic_summary_plot_gated, get_barplot
 import pickle
 
 
@@ -155,7 +155,7 @@ else:
                                  'nordic':list(nordic_opts.values()),
                                  'fc_metric':['R','C'],
                                  'ee_vs_ee':pairs_of_echo_pairs,
-                                 'qc_metric':['dBOLD','dSo','pBOLD','pSo']})
+                                 'qc_metric':['dBOLD','dSo','pBOLD','pSo','TSNR (Full Brain)','TSNR (Visual Cortex)']})
     for sbj in tqdm(sbj_list):
         for ses in  ['ses-1','ses-2']:
             partial_key = (sbj, ses)
@@ -189,7 +189,25 @@ else:
                             # REMOVE OUTLIERS: qa_xr.loc[sbj,ses,pp,nordic,'C',eep,'dSo']   = np.sqrt((reject_outliers(compute_residuals(data_df[eep1].values,data_df[eep2].values,So_line_sl,  So_line_int),3)**2).sum())
                             # Compute probabilities
                             qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD'], qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo'] = 1 - softmax(qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,['dBOLD','dSo']].values)
-        
+
+                            #TSNR 
+                            if nordic == 'Off' :
+                                d_folder = f'D02_Preproc_fMRI_{ses}'
+                            elif (nordic == 'On') & (pp=='ALL_Tedana-NORDIC_FixNComps'):
+                                d_folder = f'D05_Preproc_fMRI_{ses}_NORDIC_FixNComps'
+                            else:
+                                d_folder = f'D04_Preproc_fMRI_{ses}_NORDIC'
+
+                            pp_suffix = pp.replace('-NORDIC_FixNComps','')
+                            aux_rois_path = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_ROIs_e02_{pp_suffix}.txt')
+                            aux_fb_path   = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_FB_e02_{pp_suffix}.txt')
+                            if osp.exists(aux_rois_path) and osp.exists(aux_fb_path):
+                                aux_rois = pd.read_csv(aux_rois_path,skiprows=3, sep='\s+').drop(0).set_index('ROI_name')
+                                aux_fb   = pd.read_csv(aux_fb_path,skiprows=3, sep='\s+').drop(0).set_index('ROI_name')
+                                qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'TSNR (Visual Cortex)'] = float(aux_rois.loc['GHCP-R_Primary_Visual_Cortex','Tmed'])
+                                qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'TSNR (Full Brain)']    = float(aux_rois.loc['GHCP-R_Primary_Visual_Cortex','Tmed'])
+                            else:
+                                print('++ WARNING: TSNR info missing for [%s,%s,%s]' % (sbj,ses,aux_rois_path))
     qa_xr.to_netcdf(filename)
 
 # ***
@@ -237,15 +255,16 @@ plot_select   = pn.widgets.Select(name='Plot type',      options={'Scatter Plot'
                                                                  'FC Matrices across echoes':'FCmats_echoes',
                                                                  'Group Results (Static)':'group_res_static', 'Group Results (Dynamic)':'group_res_dynamic'})
 
-scat_lim_input = pn.widgets.FloatInput(name='Scatter Limit Value', value=1., step=0.1, start=0., end=50., width=200)
-#show_line_fit_checkbox = pn.widgets.Checkbox(name='Show Linear Fit?')
-show_line_fit_checkbox = pn.widgets.Toggle(name='Show Linear Fit', button_type='primary')
-scatter_extra_confs_card = pn.Card(scat_lim_input,show_line_fit_checkbox, title='Scatter Plot & FCs | Configuration')
+scat_lim_input                          = pn.widgets.FloatInput(name='Scatter Limit Value', value=1., step=0.1, start=0., end=50., width=200)
+show_line_fit_checkbox                  = pn.widgets.Toggle(name='Show Linear Fit', button_type='primary')
+scatter_extra_confs_card                = pn.Card(scat_lim_input,show_line_fit_checkbox, title='Scatter Plot & FCs | Configuration')
+pps_to_include_in_group_results         = pn.widgets.MultiSelect(name='Pipelines to include in Group Results', options=pp_opts, value=list(pp_opts.values())[0:3], width=200)
+remove_outliers_from_swarm_plots_toggle = pn.widgets.Toggle(name='Remove Outliers from BarPlot', button_type='primary')
 
 show_stats_toggle = pn.widgets.Toggle(name='Show Statistical Annotations', button_type='primary')
 stat_test_select  = pn.widgets.Select(name='Statistical Test', options={'Paired T-test':'t-test_paired','Independent T-test':'t-test_ind','Mann Whitney (Ind,non-param)':'Mann-Whitney'})
 annot_type_select = pn.widgets.Select(name='Annotation Type', options={'Stars':'star','Simple Annotation':'simple','Full Annotation':'full'})
-barplot_extra_confs_card = pn.Card(show_stats_toggle,stat_test_select,annot_type_select, title='Group Results (Static) | Configuration')
+barplot_extra_confs_card = pn.Card(show_stats_toggle,stat_test_select,annot_type_select,pps_to_include_in_group_results,remove_outliers_from_swarm_plots_toggle, title='Group Results (Static) | Configuration')
 sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Divider(),
            plot_select,pn.layout.Divider(),
            scatter_extra_confs_card,pn.layout.Divider(),
@@ -255,8 +274,8 @@ sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Di
 
 # -
 
-@pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select)
-def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim,show_stats,stat_test,annot_type):
+@pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select,pps_to_include_in_group_results,remove_outliers_from_swarm_plots_toggle)
+def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim,show_stats,stat_test,annot_type,pps_to_include_in_barplot,remove_outliers_from_swarm_plots):
     if plot_type == 'hexbin':
         frame = fc_across_echoes_scatter_page(data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats[nordic], hexbin=True)
         return frame
@@ -274,9 +293,15 @@ def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_
             layout.append(fcR)
         return layout
     if plot_type == 'group_res_static':
-        a = pn.Card(get_barplot(qa_xr,nordic,fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),title='Results of Speng Sample (1)')
-        b = pn.Card(get_barplot(qa_xr,nordic,fc_metric,'pBOLD',  x='Pre-processing',hue='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),title='Results of Speng Sample (2)')
-        return pn.Row(a,b)
+        a = pn.Card(get_barplot(qa_xr.sel(pp=pps_to_include_in_barplot),nordic,fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',
+                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='pBOLD for Speng Sample (1)')
+        b = pn.Card(get_barplot(qa_xr.sel(pp=pps_to_include_in_barplot),nordic,fc_metric,'pBOLD',  x='Pre-processing',hue='NORDIC',
+                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='pBOLD for Speng Sample (2)')
+        c = pn.Card(get_barplot(qa_xr.sel(pp=pps_to_include_in_barplot),nordic,fc_metric,'TSNR (Full Brain)',  hue='Pre-processing',x='NORDIC',
+                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='TSNR for Speng Sample (1)')
+        d = pn.Card(get_barplot(qa_xr.sel(pp=pps_to_include_in_barplot),nordic,fc_metric,'TSNR (Full Brain)',  x='Pre-processing',hue='NORDIC',
+                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='TSNR for Speng Sample (2)')
+        return pn.GridBox(*[a,b,c,d],ncols=2)
         #return pn.Row(get_barplot(qa_xr,nordic,fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type),
         #              get_barplot(qa_xr,nordic,fc_metric, 'dBOLD', hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type),
         #              get_barplot(qa_xr,nordic,fc_metric, 'dSo',   hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type))
@@ -291,7 +316,7 @@ def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_
             return pn.pane.Markdown('# This is not available for R-based FC')
 
 
-template = pn.template.BootstrapTemplate(title='Gating Dataset | Edge-based Results', 
+template = pn.template.BootstrapTemplate(title='Evaluation Dataset (Spreng et al.) | Edge-based Results', 
                                          sidebar=sidebar,
                                          main=get_main_frame)
 
@@ -300,3 +325,78 @@ dashboard = template.show(port=port_tunnel)
 # ***
 
 dashboard.stop()
+
+# ***
+#
+# # Figures for OHBM poster
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+from statannotations.Annotator import Annotator
+from itertools import combinations
+def get_barplot(qa_xr,nordic,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True):
+    """
+    Create Static Bar Graph for a given quality metric
+    """
+    df         = qa_xr.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+    df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
+    df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
+    num_hues   = len(list(df[hue].unique()))
+    df_swarm = df.copy()
+    if remove_outliers_from_swarm:
+        quantile_value = df[qc_metric].quantile(.97)
+        df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
+
+    if (x=='Pre-processing') and (hue=='NORDIC'):
+        pairs  = [((p,'On'),(p,'Off')) for p in df[x].unique()]
+        colors = sns.color_palette("rocket",num_hues)
+    if (x=='NORDIC') and (hue=='Pre-processing'):
+        pairs      = [(('On',c[0]),('On',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
+        pairs      = pairs + [(('Off',c[0]),('Off',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
+        colors = sns.color_palette("Set2",num_hues)
+
+    sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
+    fig, axs = plt.subplots(1,1,figsize=(6,6));
+    sns.despine(top=True, right=True)
+    sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
+    sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=.5, dodge=True, legend=False, palette=colors);
+    
+    if show_stats:
+        annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
+        annotation.configure(test=stat_test, text_format=stat_annot_type, loc='inside', verbose=0);
+        annotation.apply_test(alternative='two-sided');
+        annotation.annotate();
+    sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=4, title=None, frameon=False,)
+    plt.tight_layout()
+    plt.close()
+    return fig
+
+
+a = get_barplot(qa_xr.sel(pp=['ALL_Basic','ALL_GSasis','ALL_Tedana']),'Off','C','pBOLD',hue='Pre-processing',x='NORDIC',stat_test='t-test_paired', show_stats=True, stat_annot_type='star', legend_location='lower left', )
+
+a
+
+a.savefig('./saved_images/pBOLD_evaluation_group_result.eps')
+
+a = get_barplot(qa_xr.sel(pp=['ALL_Basic','ALL_GSasis','ALL_Tedana']),'Off','C','TSNR (Full Brain)',hue='Pre-processing',x='NORDIC',stat_test='t-test_paired', show_stats=True, stat_annot_type='star', legend_location='lower left', )
+a
+
+a.savefig('./saved_images/TSNR_evaluation_group_result.eps')
+
+a = get_barplot(qa_xr.sel(pp=['ALL_Basic','ALL_GSasis','ALL_Tedana','ALL_Tedana-NORDIC_FixNComps']),'On','C','TSNR (Full Brain)',x='Pre-processing',hue='NORDIC',stat_test='t-test_paired', show_stats=True, stat_annot_type='star', legend_location='lower left', )
+
+
+a
+
+fc_metric, qc_metric = 'C','TSNR (Full Brain)'
+df         = qa_xr.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
+df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
+
+df['TSNR (Full Brain)'].replace() df['TSNR (Full Brain)'].quantile(.97)
+
+quantile_value = df['TSNR (Full Brain)'].quantile(.97)
+df['TSNR (Full Brain)'] = df['TSNR (Full Brain)'].where(df['TSNR (Full Brain)'] <= quantile_value, quantile_value)
+    
+
+

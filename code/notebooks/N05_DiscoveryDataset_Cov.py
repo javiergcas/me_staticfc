@@ -131,6 +131,8 @@ for sbj in tqdm(sbj_list, desc='Subject'):
                     Nt,_ = roi_ts_x.shape
                     data_cvar[sbj, ses, pp,nordic,'|'.join((e_x,e_y)),'C']  = (roi_ts_x * roi_ts_y).sum(axis=0)/(Nt-1)
 
+roi_ts_x.shape, roi_ts_y.shape,((roi_ts_x * roi_ts_y).sum(axis=0)/(Nt-1)).shape
+
 # ***
 #
 # # 4. Compute QA-metrics

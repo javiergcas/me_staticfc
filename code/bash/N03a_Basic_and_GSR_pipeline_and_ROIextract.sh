@@ -1,6 +1,6 @@
 #!/bin/bash
 # 10/22/2024 - Javier Gonzalez-Castillo
-#
+# 06/06/2025 - JGC Script now computes TSNR on errts files
 # This script will do teh regression of common nuisances in the volreg and extract
 # FC and timeseries
 
@@ -14,6 +14,7 @@ PRCS_DATA_DIR=`echo ${PRJDIR}/prcs_data`
 
 SBJ_DIR=`echo ${PRCS_DATA_DIR}/${SBJ}`
 
+# NOTE: This needs to change once we re-organize folders
 # Trick to pick results for NORDIC pipeline without having to re-write other notebooks
 if [[ -z ${AFNIPROC_OUTDIR} ]]; then
    echo "++ WARNING: Variable {AFNIPROC_OUTDIR} not provided --> setting FMRI_DATA_DIR to default value"
@@ -145,7 +146,7 @@ done
 # Next we do this keeping all timepoins (i.e., no censoring)
 for EC in e01 e02 e03
 do
-   echo " + Denoising echo [${EC} | ALL]"
+  echo " + Denoising echo [${EC} | ALL]"
    3dTproject -overwrite                                                              \
                -polort 0                                                              \
                -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
@@ -194,6 +195,39 @@ do
     3dROIstats -quiet                                                                                   \
                -mask ${ATLAS_PATH}                                                                      \
                errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}_000.netts
+  done
+done
+
+# Compute TSNR
+# ------------
+echo "++ Computing Full Brain TSNR for Basic and GSasis"
+echo "================================================="
+for EC in e01 e02 e03
+do
+  for SCENARIO in ALL_Basic ALL_GSasis
+  do
+      3dTstat -overwrite -mean -prefix rm.signal.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc 
+      3dTstat -overwrite -stdev -prefix rm.noise.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}+tlrc
+      3dcalc -overwrite -a rm.signal.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii -b rm.noise.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii -expr 'a/b' -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.TSNR.nii
+      # Compute TSNR at the whole-brain level
+      compute_ROI_stats.tcsh                                                           \
+         -out_dir    tsnr_stats_regress                                                \
+         -stats_file tsnr_stats_regress/TSNR_FB_${EC}_${SCENARIO}.txt                  \
+         -dset_ROI   mask_epi_anat.${SBJ}+tlrc                                         \
+         -dset_data  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.TSNR.nii \
+         -rset_label brain                                                             \
+         -rval_list  1
+
+     # Compute TSNR at the ROI level (same ROIs used by afni_proc for the report)
+     compute_ROI_stats.tcsh                                                            \
+         -out_dir    tsnr_stats_regress                                                \
+         -stats_file tsnr_stats_regress/TSNR_ROIs_${EC}_${SCENARIO}.txt                \
+         -dset_ROI   ROI_import_MNI_2009c_asym_resam+tlrc                              \
+         -dset_data  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.TSNR.nii \
+         -rset_label MNI_2009c_asym                                                    \
+         -rval_list  ALL_LT
+
+     rm rm.signal.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii rm.noise.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii
   done
 done
 

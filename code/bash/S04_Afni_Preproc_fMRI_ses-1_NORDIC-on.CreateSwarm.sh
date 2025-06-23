@@ -10,11 +10,11 @@ PRCSDATA_DIR=`echo ${PRJDIR}/prcs_data`
 DOWNLOAD_DIR=`echo ${PRJDIR}/openeuro/des003592-download`
 SUBJECTS_DIR=`echo ${PRJDIR}/freesurfer/`
 SCRIPTS_DIR=`echo ${PRJDIR}/me_staticfc/code/bash`
-AFNI_PROC_OUT_DIR=`echo ${SCRIPTS_DIR}/S04_Afni_Preproc_fMRI_${SES}_NORDIC`
+AFNI_PROC_OUT_DIR=`echo ${SCRIPTS_DIR}/S04_Afni_Preproc_fMRI_${SES}_NORDIC-on`
 RESOURCES_DIR='/data/SFIMJGC_HCP7T/BCBL2024/resources/'
 USERNAME=`whoami`
-SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S04_Afni_Preproc_fMRI_${SES}_NORDIC.SWARM.sh`
-LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S04_Afni_Preproc_fMRI_${SES}_NORDIC.logs`
+SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S04_Afni_Preproc_fMRI_${SES}_NORDIC-on.SWARM.sh`
+LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S04_Afni_Preproc_fMRI_${SES}_NORDIC-on.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "sub-*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
 echo "++ Orig Data Folder  : ${PRCSDATA_DIR}"
@@ -58,7 +58,7 @@ do
     else
        echo "${SBJ} ${SES}" >> ${RESOURCES_DIR}/S04_WillTry.txt
        FMRI_ORIG_DIR=`echo ${DOWNLOAD_DATA}/${SBJ}/${SES}/func`
-       OUT_DIR=`echo ${PRJDIR}/prcs_data/${SBJ}/D04_Preproc_fMRI_${SES}_NORDIC`
+       OUT_DIR=`echo ${PRJDIR}/prcs_data/${SBJ}/D02_Preproc_fMRI_${SES}_NORDIC-on`
 
        SITE=`grep "${SBJ}\b" ${DOWNLOAD_DIR}/participants.tsv | awk -F '\t' '{print $3}'`
        if [[ "${SITE}" == "1" ]]; then ECHOTIMES="13.7 30 47"; else ECHOTIMES="14 29.96 45.92"; fi
@@ -82,7 +82,7 @@ do
                               ${PRJDIR}/prcs_data/${SBJ}/D03_NORDIC/${SBJ}_${SES}_task-rest_echo-3_bold.NORDIC.nii.gz  \
                 -echo_times ${ECHOTIMES}                                                                     \
                 -combine_method m_tedana                                                                     \
-                -combine_opts_tedana --verbose                                                               \
+                -combine_opts_tedana --verbose --out-dir tedana_fastica                                      \
                 -align_unifize_epi local                                                                     \
                 -align_opts_aea -cost lpc+ZZ -giant_move -check_flip                                         \
                 -tlrc_base MNI152_2009_template_SSW.nii.gz                                                   \
@@ -112,13 +112,13 @@ do
                 -regress_run_clustsim no                                                                     \
                 -html_review_style pythonic                                                                  \
                 -out_dir ${OUT_DIR}                                                                          \
-                -script ${AFNI_PROC_OUT_DIR}/S04_Afni_Preproc_fMRI_NORDIC.${SBJ}_${SES}.sh                          \
+                -script ${AFNI_PROC_OUT_DIR}/S04_Afni_Preproc_fMRI_NORDIC.${SBJ}_${SES}_NORDIC-on.sh         \
                 -regress_compute_tsnr yes                                                                    \
                 -regress_make_cbucket yes                                                                    \
                 -scr_overwrite
 
        # Add line for this subject to the Swarm file
-       echo "module load afni; source /data/SFIMJGC_HCP7T/Apps/miniconda38/etc/profile.d/conda.sh && conda activate tedana_2024a; tcsh -xef ${AFNI_PROC_OUT_DIR}/S04_Afni_Preproc_fMRI_NORDIC.${SBJ}_${SES}.sh 2>&1 | tee ${AFNI_PROC_OUT_DIR}/output.S04_Afni_Preproc_fMRI_NORDIC.${SBJ}_${SES}.txt" >> ${SWARM_PATH}
+       echo "module load afni; source /data/SFIMJGC_HCP7T/Apps/miniconda38/etc/profile.d/conda.sh && conda activate tedana_2024a; tcsh -xef ${AFNI_PROC_OUT_DIR}/S04_Afni_Preproc_fMRI_NORDIC.${SBJ}_${SES}_NORDIC-on.sh 2>&1 | tee ${AFNI_PROC_OUT_DIR}/output.S04_Afni_Preproc_fMRI_NORDIC.${SBJ}_${SES}_NORDIC-on.txt" >> ${SWARM_PATH}
     fi
 fi
 done

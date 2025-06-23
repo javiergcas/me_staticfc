@@ -100,6 +100,14 @@ report_keepers_path  = osp.join(PRJ_DIR,'prcs_data','review_keepers.txt')
 
 report_summary_df = read_gen_ss_review_table(report_summary_path)
 
+# As we shall see in later notebooks, there will be three subjects for whom one scan passed criteria and another one did not. The next three cells show that the cause for that is the EPI/anat overlap being below 0.88
+
+report_summary_df.set_index('subject ID').loc['sub-12']
+
+report_summary_df.set_index('subject ID').loc['sub-142']
+
+report_summary_df.set_index('subject ID').loc['sub-53']
+
 # ***
 #
 # # 2. Load the list of scans that passed QC criteria
@@ -159,9 +167,5 @@ ses_idx = [i.split('/')[2].split('_')[-1] for i in report_keepers_df['infile'].v
 report_keepers_df.index = pd.MultiIndex.from_arrays([sbj_idx,ses_idx],names=['Subject','Session'])
 
 report_keepers_df.to_csv('../../../resources/good_scans.txt')
-
-report_keepers_df.set_index('subject ID').loc['sub-237']
-
-report_keepers_df.loc['sub-237',:]
 
 

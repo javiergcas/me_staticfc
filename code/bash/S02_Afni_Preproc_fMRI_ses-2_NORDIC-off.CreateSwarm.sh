@@ -52,7 +52,7 @@ do
     else
        echo "${SBJ} ${SES}" >> ${RESOURCES_DIR}/S02_WillTry.txt
        FMRI_ORIG_DIR=`echo ${DOWNLOAD_DATA}/${SBJ}/${SES}/func`
-       OUT_DIR=`echo ${PRJDIR}/prcs_data/${SBJ}/D02_Preproc_fMRI_${SES}`
+       OUT_DIR=`echo ${PRJDIR}/prcs_data/${SBJ}/D02_Preproc_fMRI_${SES}_NORDIC-off`
 
        SITE=`grep "${SBJ}\b" ${DOWNLOAD_DIR}/participants.tsv | awk -F '\t' '{print $3}'`
        if [[ "${SITE}" == "1" ]]; then ECHOTIMES="13.7 30 47"; else ECHOTIMES="14 29.96 45.92"; fi
@@ -76,7 +76,7 @@ do
                               ${DOWNLOAD_DIR}/${SBJ}/${SES}/func/${SBJ}_${SES}_task-rest_echo-3_bold.nii.gz  \
                 -echo_times ${ECHOTIMES}                                                                     \
                 -combine_method m_tedana                                                                     \
-                -combine_opts_tedana --verbose                                                               \
+                -combine_opts_tedana --verbose --out-dir tedana_fastica                                      \
                 -align_unifize_epi local                                                                     \
                 -align_opts_aea -cost lpc+ZZ -giant_move -check_flip                                         \
                 -tlrc_base MNI152_2009_template_SSW.nii.gz                                                   \

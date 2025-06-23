@@ -23,6 +23,8 @@ if [[ -z ${AFNIPROC_OUTDIR} ]]; then
 else
    FMRI_DATA_DIR=`echo ${AFNIPROC_OUTDIR}/`
    echo "++ INFO: Setting FMRI_DATA_DIR=${FMRI_DATA_DIR} as provided via AFNIPROC_OUTDIR"
+   cd ${FMRI_DATA_DIR} 
+   ln -fs ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ${FMRI_DATA_DIR}/mask_tedana_at_least_one_echo.nii.gz
 fi
 # End of trick
 
@@ -41,7 +43,6 @@ echo "++ Entering FMRI_DATA_DIR"
 echo "========================="
 cd ${FMRI_DATA_DIR}
 echo " +  `pwd`"
-ln -fs ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ${FMRI_DATA_DIR}/mask_tedana_at_least_one_echo.nii.gz
 
 echo "++ Scaling data post volreg"
 echo "++ ========================"

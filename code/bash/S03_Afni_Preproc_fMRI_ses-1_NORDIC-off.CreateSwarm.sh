@@ -10,11 +10,11 @@ PRCSDATA_DIR=`echo ${PRJDIR}/prcs_data`
 DOWNLOAD_DIR=`echo ${PRJDIR}/openeuro/des003592-download`
 SUBJECTS_DIR=`echo ${PRJDIR}/freesurfer/`
 SCRIPTS_DIR=`echo ${PRJDIR}/me_staticfc/code/bash`
-AFNI_PROC_OUT_DIR=`echo ${SCRIPTS_DIR}/S02_Afni_Preproc_fMRI_${SES}`
+AFNI_PROC_OUT_DIR=`echo ${SCRIPTS_DIR}/S03_Afni_Preproc_fMRI_${SES}_NORDIC-off`
 RESOURCES_DIR='/data/SFIMJGC_HCP7T/BCBL2024/resources/'
 USERNAME=`whoami`
-SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S02_Afni_Preproc_fMRI_${SES}.SWARM.sh`
-LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S02_Afni_Preproc_fMRI_${SES}.logs`
+SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S03_Afni_Preproc_fMRI_${SES}_NORDIC-off.SWARM.sh`
+LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S03_Afni_Preproc_fMRI_${SES}_NORDIC-off.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "sub-*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
 echo "++ Orig Data Folder  : ${PRCSDATA_DIR}"
@@ -48,9 +48,9 @@ do
     SBJ=`basename ${sbj_path}`
     ANAT_PROC_DIR=`echo ${PRJDIR}/prcs_data/${SBJ}/D01_Anatomical`
     if [ ! -f ${ANAT_PROC_DIR}/anatQQ.${SBJ}.nii.gz ]; then
-       echo "${SBJ} ${SES}" >> ${RESOURCES_DIR}/S02_NotAvailable.txt
+       echo "${SBJ} ${SES}" >> ${RESOURCES_DIR}/S03_NotAvailable.txt
     else
-       echo "${SBJ} ${SES}" >> ${RESOURCES_DIR}/S02_WillTry.txt
+       echo "${SBJ} ${SES}" >> ${RESOURCES_DIR}/S03_WillTry.txt
        FMRI_ORIG_DIR=`echo ${DOWNLOAD_DATA}/${SBJ}/${SES}/func`
        OUT_DIR=`echo ${PRJDIR}/prcs_data/${SBJ}/D02_Preproc_fMRI_${SES}_NORDIC-off`
 
@@ -106,13 +106,13 @@ do
                 -regress_run_clustsim no                                                                     \
                 -html_review_style pythonic                                                                  \
                 -out_dir ${OUT_DIR}                                                                          \
-                -script ${AFNI_PROC_OUT_DIR}/S02_Afni_Preproc_fMRI.${SBJ}_${SES}.sh                          \
+                -script ${AFNI_PROC_OUT_DIR}/S03_Afni_Preproc_fMRI.${SBJ}_${SES}_NORDIC-off.sh               \
                 -regress_compute_tsnr yes                                                                    \
                 -regress_make_cbucket yes                                                                    \
                 -scr_overwrite
 
        # Add line for this subject to the Swarm file
-       echo "module load afni; source /data/SFIMJGC_HCP7T/Apps/miniconda38/etc/profile.d/conda.sh && conda activate tedana_2024a; tcsh -xef ${AFNI_PROC_OUT_DIR}/S02_Afni_Preproc_fMRI.${SBJ}_${SES}.sh 2>&1 | tee ${AFNI_PROC_OUT_DIR}/output.S02_Afni_Preproc_fMRI.${SBJ}_${SES}.txt" >> ${SWARM_PATH}
+       echo "module load afni; source /data/SFIMJGC_HCP7T/Apps/miniconda38/etc/profile.d/conda.sh && conda activate tedana_2024a; tcsh -xef ${AFNI_PROC_OUT_DIR}/S03_Afni_Preproc_fMRI.${SBJ}_${SES}_NORDIC-off.sh 2>&1 | tee ${AFNI_PROC_OUT_DIR}/output.S03_Afni_Preproc_fMRI.${SBJ}_${SES}_NORDIC-off.txt" >> ${SWARM_PATH}
     fi
 done
 

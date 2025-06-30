@@ -6,29 +6,25 @@ ml afni
 PRJDIR='/data/SFIMJGC_HCP7T/BCBL2024'   # Project directory: includes Scripts, Freesurfer and PrcsData folders
 
 PRCSDATA_DIR=`echo ${PRJDIR}/prcs_data`
-DOWNLOAD_DIR=`echo ${PRJDIR}/openeuro/des003592-download/`
 SUBJECTS_DIR=`echo ${PRJDIR}/freesurfer/`
-SCRIPTS_DIR=`echo ${PRJDIR}/me_staticfc/code/bash`
-AFNI_PROC_OUT_DIR=`echo ${SCRIPTS_DIR}/S04_Afni_Preproc_fMRI_${SES}.NORDIC`
-RESOURCES_DIR='/data/SFIMJGC_HCP7T/BCBL2024/resources/'
 USERNAME=`whoami`
-SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S04_Afni_Preproc_fMRI_${SES}.NORDIC.SWARM.sh`
-LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S04_Afni_Preproc_fMRI_${SES}.NORDIC.logs`
-sessions=(ses-1 ses-2)
-echo "++ Orig Data Folder  : ${PRCSDATA_DIR}"
-echo "++ Scripts Folder    : ${SCRIPTS_PATH}"
-echo "++ Swarm Folder      : ${SWARM_PATH}"
-echo "++ Logs Folder       : ${LOGS_DIR}"
+if [ $DATASET = "discovery" ]; then
+   sessions=(cardiac_gated constant_gated)
+else
+   sessions=(ses-1 ses-2)
+fi
+echo "++ Prcs Data Folder  : ${PRCSDATA_DIR}"
 echo "++ Freesurfer Folder : ${SUBJECTS_DIR}"
-echo "++ Afni Proc Out Dir : ${AFNI_PROC_OUT_DIR}"
-
+echo "++ Download Folder   : ${DOWNLOAD_DIR}"
+echo "++ Subject ID        : ${SBJ}"
+echo "++ Session: ${sessions[@]}"
 
 # Generate Signal-Free mask outside the brain for computation of Thermal Noise
 # ============================================================================
 for SES in ${sessions[@]}
 do
    PRE_NORDIC_DIR=`echo ${DOWNLOAD_DIR}/${SBJ}/${SES}/func/`
-   POST_NORDIC_DIR=`echo ${PRCSDATA_DIR}/${SBJ}/D03_NORDIC/`
+   POST_NORDIC_DIR=`echo ${PRCSDATA_DIR}/${SBJ}/D02_NORDIC/`
   
    # Compute Mean signal level per voxel in each echo (pre-NORDIC) 
    3dTstat -overwrite -mean -zcount -prefix ${POST_NORDIC_DIR}/rm.${SES}.e01.pre_nordic.stats.nii.gz ${PRE_NORDIC_DIR}/${SBJ}_${SES}_task-rest_echo-1_bold.nii.gz
@@ -58,8 +54,8 @@ done
 
 # Generate final mask for computation of thermal noise
 # ====================================================
-3dcalc -overwrite -a ${POST_NORDIC_DIR}/rm.ses-1.post_nordic.thermal_noise_mask.nii.gz \
-                  -b ${POST_NORDIC_DIR}/rm.ses-2.post_nordic.thermal_noise_mask.nii.gz  \
+3dcalc -overwrite -a ${POST_NORDIC_DIR}/rm.${sessions[0]}.post_nordic.thermal_noise_mask.nii.gz \
+                  -b ${POST_NORDIC_DIR}/rm.${sessions[1]}.post_nordic.thermal_noise_mask.nii.gz  \
                   -expr 'a*b' \
                   -prefix ${POST_NORDIC_DIR}/${SBJ}.thermal_noise_mask.nii.gz
 
@@ -75,7 +71,7 @@ do
    for SES in ${sessions[@]}
    do
       PRE_NORDIC_DIR=`echo ${DOWNLOAD_DIR}/${SBJ}/${SES}/func/`
-      POST_NORDIC_DIR=`echo ${PRCSDATA_DIR}/${SBJ}/D03_NORDIC/`
+      POST_NORDIC_DIR=`echo ${PRCSDATA_DIR}/${SBJ}/D02_NORDIC/`
       for e in 1 2 3
       do
           if [ "${scenario}" == NORDIC ]; then

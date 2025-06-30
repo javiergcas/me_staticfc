@@ -6,6 +6,7 @@ from sfim_lib.plotting.fc_matrices import hvplot_fc
 import panel as pn
 import pandas as pd
 import numpy as np
+import xarray as xr
 from nilearn.connectome import sym_matrix_to_vec, vec_to_sym_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -228,32 +229,39 @@ def cov_across_echoes_scatter_page(cov_data,qa_data,sbj,ses,pp, nordic, pairs_of
     
 # Static Group Level Report Functions
 # ====================================
-def get_barplot(qa_xr,nordic,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True):
+def get_barplot(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2'):
     """
     Create Static Bar Graph for a given quality metric
     """
-    df         = qa_xr.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
-    df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
-    df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
-    num_hues   = len(list(df[hue].unique()))
+    if isinstance(qa, xr.DataArray):
+        df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+        df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
+        df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
+    elif isinstance(qa, pd.DataFrame):
+        df = qa.copy()
+    else:
+        print("++ ERROR [get_barplot]: Expected a xarray or pandas dataframe but got something else. Function exiting")
+        return None
+    
+    # Extract available values for X and HUE
+    x_options   = list(df[x].unique())
+    hue_options = list(df[hue].unique())
+    num_xs      = len(x_options)
+    num_hues    = len(hue_options)
+    
     df_swarm = df.copy()
     if remove_outliers_from_swarm:
         quantile_value = df[qc_metric].quantile(.97)
         df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
-
-    if (x=='Pre-processing') and (hue=='NORDIC'):
-        pairs  = [((p,'On'),(p,'Off')) for p in df[x].unique()]
-        colors = sns.color_palette("rocket",num_hues)
-    if (x=='NORDIC') and (hue=='Pre-processing'):
-        pairs      = [(('On',c[0]),('On',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
-        pairs      = pairs + [(('Off',c[0]),('Off',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
-        colors = sns.color_palette("Set2",num_hues)
+        df_swarm.dropna(inplace=True)
+    pairs  = [((x,h[1]),(x,h[0])) for x in x_options for h in combinations(hue_options,2)]
+    colors = sns.color_palette(palette,num_hues) 
 
     sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
     fig, axs = plt.subplots(1,1,figsize=(6,6));
     sns.despine(top=True, right=True)
     sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
-    sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=.5, dodge=True, legend=False, palette=colors);
+    sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=1, dodge=True, legend=False, palette=colors);
     
     if show_stats:
         annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
@@ -264,6 +272,44 @@ def get_barplot(qa_xr,nordic,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC'
     plt.tight_layout()
     plt.close()
     return fig
+    
+# def get_barplot(qa,nordic,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True):
+#     """
+#     Create Static Bar Graph for a given quality metric
+#     """
+#     if isinstance(qa, xr.DataArray):
+#         df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+#         df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
+#         df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
+    
+#     num_hues   = len(list(df[hue].unique()))
+#     df_swarm = df.copy()
+#     if remove_outliers_from_swarm:
+#         quantile_value = df[qc_metric].quantile(.97)
+#         df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
+#     if (x=='Pre-processing') and (hue=='NORDIC'):
+#         pairs  = [((p,'On'),(p,'Off')) for p in df[x].unique()]
+#         colors = sns.color_palette("rocket",num_hues)
+#     if (x=='NORDIC') and (hue=='Pre-processing'):
+#         pairs      = [(('On',c[0]),('On',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
+#         pairs      = pairs + [(('Off',c[0]),('Off',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
+#         colors = sns.color_palette("Set2",num_hues)
+
+#     sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
+#     fig, axs = plt.subplots(1,1,figsize=(6,6));
+#     sns.despine(top=True, right=True)
+#     sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
+#     sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=.5, dodge=True, legend=False, palette=colors);
+    
+#     if show_stats:
+#         annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
+#         annotation.configure(test=stat_test, text_format=stat_annot_type, loc='inside', verbose=0);
+#         annotation.apply_test(alternative='two-sided');
+#         annotation.annotate();
+#     sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=4, title=None, frameon=False,)
+#     plt.tight_layout()
+#     plt.close()
+#     return fig
 
 def get_barplot_discovery_dataset(qa_xr,nordic,fc_metric,qc_metric,x='Pre-processing',hue='Session',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best'):
     """

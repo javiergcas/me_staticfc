@@ -2,6 +2,7 @@ import os.path as osp
 import pandas as pd
 import numpy as np
 from itertools import combinations_with_replacement, combinations
+import statsmodels.api as sm
 
 PRJ_DIR       = '/data/SFIMJGC_HCP7T/BCBL2024/'
 ATLAS_NAME    = 'Schaefer2018_400Parcels_17Networks'
@@ -14,6 +15,8 @@ SPRENG_DOWNLOAD_DIR = osp.join(PRJ_DIR,'openeuro','des003592-download')
 TES_MSEC = {'Gating':{'e01':13.9,'e02':31.7, 'e03':49.5},
             'Spreng_Scanner1':{'e01':13.7,'e02':30,'e03':47},
             }
+
+NUM_DISCARDED_VOLUMES = {'Spreng_Scanner1':3.0}
 
 SESSIONS = {'Gating':['constant_gating','cardiac_gating'],
             'Spreng_Scanner1':['ses-1','ses-2']}
@@ -31,6 +34,36 @@ pairs_of_echo_pairs = ['|'.join((e_x[0],e_x[1]))+'_vs_'+'|'.join((e_y[0],e_y[1])
 
 Power264_cmap = {''}
 
+def detrend_signal(y):
+    """
+    Removes mean and linear treand from a signal
+    """
+    nt    = len(y)
+    trend = sm.add_constant(np.arange(nt))
+    y_detrended = sm.OLS(y, trend).fit().resid
+    return y_detrended
+
+def read_group_physio_reports(path):
+    """
+    Reads the output of command gen_ss_review_table when
+    used on the outputs of phys_calc
+    """
+    df = pd.read_csv(path, sep='\t', header=[0,1] )
+    new_columns = []
+    current_lvl1 = None
+    # Deal with empty labels in second level of column name
+    for lvl1, lvl2 in df.columns:
+        if "Unnamed" in str(lvl1):
+            new_columns.append((current_lvl1, lvl2))
+        else:
+            current_lvl1 = lvl1
+            new_columns.append((lvl1, lvl2))
+    
+    df.columns = pd.MultiIndex.from_tuples(new_columns)
+    # Add index based on Subject and Run
+    df.index = pd.MultiIndex.from_tuples([v.split('_') for v in df[('subject','value')]], names=['Subject','Run'])
+    return df
+    
 def read_gen_ss_review_table(file_path):
     """
     Reads the output of AFNI command gen_ss_review_table and

@@ -15,7 +15,17 @@
 
 # # Description: Evaluate NORDIC ability at removing Thermal Noise
 #
-# Prior to using this notebook, you need to run the ```bash/S06...``` script series to estimate thermal noise in both datasets
+# Prior to using this notebook, you need to run the ```bash/S03_ThermalNoiseEstimation...``` script to estimate thermal noise in all scans and TEs from both datasets.
+#
+# For each scan, this script will write two files:
+#
+# * ```{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_off.ThermalNoise.txt```: holds thermal noise estimates before applying NORDIC.
+# * ```{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_on.ThermalNoise.txt```: holds thermal noise estimates after applying NORDIC.
+#
+# Expectations:
+#
+# * Thermal noise should be TE independent, yet becuase the suboptimal way in which we are measuring thermal noise, a slight difference migth occur.
+# * Thermal noise should be significantly smaller after NORDIC for all echoes.
 
 import pandas as pd
 import os.path as osp
@@ -47,10 +57,10 @@ dataset_info_df = pd.DataFrame(index=pd.MultiIndex.from_product([sbj_list,ses_li
 df_list = []
 for sbj,ses in tqdm(dataset_info_df.index, desc='Scan'):
     for e in range(1,4):
-        aux_path = osp.join(PRCS_DATA_DIR,sbj,'D03_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_off.ThermalNoise.txt')
+        aux_path = osp.join(PRCS_DATA_DIR,sbj,'D02_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_off.ThermalNoise.txt')
         aux      = np.loadtxt(aux_path)
         df_list.append( {'Subject':sbj,'Session':ses,'NORDIC':'off','Echo':e,'Thermal Noise':np.mean(aux[10::])})
-        aux_path = osp.join(PRCS_DATA_DIR,sbj,'D03_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_on.ThermalNoise.txt')
+        aux_path = osp.join(PRCS_DATA_DIR,sbj,'D02_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_on.ThermalNoise.txt')
         aux      = np.loadtxt(aux_path)
         df_list.append( {'Subject':sbj,'Session':ses,'NORDIC':'on','Echo':e,'Thermal Noise':np.mean(aux[10::])})
 df = pd.DataFrame(df_list)
@@ -77,6 +87,27 @@ annotation.configure(test='t-test_paired', loc='inside', verbose=0, comparisons_
 annotation.apply_test(alternative='two-sided');
 annotation.annotate();
 
+# Same as above, but showing statistical test across NORDIC scenarios
+
+fig, axs = plt.subplots(1,2,figsize=(14,7))
+# Results for Constant Gated
+sns.barplot(  data=df_ConstG,x='NORDIC',hue='Echo',y='Thermal Noise', palette='Set2', errorbar='ci', ax=axs[0], alpha=0.5).set_title('Constant Gated Data (Thermal Noise)')
+sns.swarmplot(data=df_ConstG,x='NORDIC',hue='Echo',y='Thermal Noise', palette='Set2',ax=axs[0], dodge=True, legend=False)
+pairs=[(('off',1),('on',1)),(('off',2),('on',2)),(('off',3),('on',3))]
+annotation = Annotator(axs[0], pairs, data=df_ConstG, x='NORDIC', y='Thermal Noise',hue='Echo')
+annotation.configure(test='t-test_paired', loc='inside', verbose=0, comparisons_correction="Bonferroni");
+annotation.apply_test(alternative='two-sided');
+annotation.annotate();
+# Results for Cardiac Gated
+sns.barplot(  data=df_CardG,x='NORDIC',hue='Echo',y='Thermal Noise', palette='Set2', errorbar='ci', ax=axs[1], alpha=0.5).set_title('Cardiac Gated Data (Thermal Noise)')
+sns.swarmplot(data=df_CardG,x='NORDIC',hue='Echo',y='Thermal Noise', palette='Set2',ax=axs[1], dodge=True, legend=False)
+sns.despine()
+pairs=[(('off',1),('on',1)),(('off',2),('on',2)),(('off',3),('on',3))]
+annotation = Annotator(axs[1], pairs, data=df_CardG, x='NORDIC', y='Thermal Noise',hue='Echo')
+annotation.configure(test='t-test_paired', loc='inside', verbose=0, comparisons_correction="Bonferroni");
+annotation.apply_test(alternative='two-sided');
+annotation.annotate();
+
 # This next section creates a small dashboard to explore how thermal noise changes over time
 
 xr_th = xr.DataArray(dims=['Subject','Session','NORDIC','Echo','TR'],
@@ -85,7 +116,7 @@ xr_th = xr.DataArray(dims=['Subject','Session','NORDIC','Echo','TR'],
 for sbj,ses in tqdm(dataset_info_df.index, desc='Scan'):
     for e in range(1,4):
         for NORDIC in ['on','off']:
-            aux_path = osp.join(PRCS_DATA_DIR,sbj,'D03_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_{NORDIC}.ThermalNoise.txt')
+            aux_path = osp.join(PRCS_DATA_DIR,sbj,'D02_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_{NORDIC}.ThermalNoise.txt')
             xr_th.loc[sbj,ses,NORDIC,e,:]      = np.loadtxt(aux_path)[10::]
 
 # +
@@ -118,14 +149,13 @@ dataset_info_df = pd.read_csv(osp.join(PRJ_DIR,'resources','good_scans.txt'))
 dataset_info_df = dataset_info_df.set_index(['Subject','Session'])
 print('++ Number of scans: %s scans' % dataset_info_df.shape[0])
 
-#df = pd.DataFrame(columns=['Subject','Session','NORDIC','Echo','Thermal Noise'])
 df_list = []
 for sbj,ses in tqdm(dataset_info_df.index, desc='Scan'):
     for e in range(1,4):
-        aux_path = osp.join(PRCS_DATA_DIR,sbj,'D03_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_off.ThermalNoise.txt')
+        aux_path = osp.join(PRCS_DATA_DIR,sbj,'D02_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_off.ThermalNoise.txt')
         aux      = np.loadtxt(aux_path)
         df_list.append( {'Subject':sbj,'Session':ses,'NORDIC':'off','Echo':e,'Thermal Noise':np.mean(aux[10::])})
-        aux_path = osp.join(PRCS_DATA_DIR,sbj,'D03_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_on.ThermalNoise.txt')
+        aux_path = osp.join(PRCS_DATA_DIR,sbj,'D02_NORDIC',f'{sbj}_{ses}_task-rest_echo-{e}_bold.NORDIC_on.ThermalNoise.txt')
         aux      = np.loadtxt(aux_path)
         df_list.append( {'Subject':sbj,'Session':ses,'NORDIC':'on','Echo':e,'Thermal Noise':np.mean(aux[10::])})
 df = pd.DataFrame(df_list)

@@ -7,8 +7,8 @@ ORIG_DATA_DIR='/data/SFIMJGC_HCP7T/BCBL2024/openeuro/des003592-download/'
 SUBJECTS_DIR='/data/SFIMJGC_HCP7T/BCBL2024/freesurfer/'
 RESOURCES_DIR='/data/SFIMJGC_HCP7T/BCBL2024/resources/'
 USERNAME=`whoami`
-SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S00b_Freesurfer2AFNI.SWARM.sh`
-LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S00b_Freesurfer2AFNI.logs`
+SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S00b_Freesurfer2AFNI.evaluation.SWARM.sh`
+LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S00b_Freesurfer2AFNI.evaluation.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "sub-*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
 echo "++ Subjects          : ${subjects[@]}"

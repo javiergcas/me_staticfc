@@ -7,8 +7,8 @@ ORIG_DATA_DIR='/data/SFIMJGC_HCP7T/BCBL2024/openeuro/meica_eval/'
 SUBJECTS_DIR='/data/SFIMJGC_HCP7T/BCBL2024/freesurfer/'
 RESOURCES_DIR='/data/SFIMJGC_HCP7T/BCBL2024/resources/'
 USERNAME=`whoami`
-SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S00b_Freesurfer2AFNI.meica_eval.SWARM.sh`
-LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S00b_Freesurfer2AFNI.meica_eval.logs`
+SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S00b_Freesurfer2AFNI.discovery.SWARM.sh`
+LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S00b_Freesurfer2AFNI.discovery.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "MGSBJ*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
 echo "++ Subjects          : ${subjects[@]}"

@@ -6,8 +6,8 @@ PRCS_DATA_DIR='/data/SFIMJGC_HCP7T/BCBL2024/prcs_data/'
 RESOURCES_DIR='/data/SFIMJGC_HCP7T/BCBL2024/resources/'
 SCRIPTS_DIR='/data/SFIMJGC_HCP7T/BCBL2024/me_staticfc/code/bash/'
 USERNAME=`whoami`
-SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S01_Preproc_Anat.SWARM.sh`
-LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S01_Preproc_Anat.logs`
+SWARM_PATH=`echo /data/SFIMJGC_HCP7T/BCBL2024/swarm.${USERNAME}/S01_Preproc_Anat.evaluation.SWARM.sh`
+LOGS_DIR=`echo /data/SFIMJGC_HCP7T/BCBL2024/logs.${USERNAME}/S01_Preproc_Anat.evaluation.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "sub-*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
 #echo "++ Subjects          : ${subjects[@]}"

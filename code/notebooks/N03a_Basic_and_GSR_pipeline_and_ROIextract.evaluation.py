@@ -46,9 +46,9 @@
 #     * computes scaled version of ```pb03.${SBJ}.r01.${EC}.volreg+tlrc```
 #     * extracts GS from that scaled version in two ways (as is & after detrending with 5th order legendre polynomials)
 #     * regression: motion + 1rt der, compCorr, banspass, legendre (up to 5th), and GS
-#     * **output 4D**: ```errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis```
-#     * **output TS**: ```errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}_000.netts```
-#     * **output FC**: ```errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}_000.netcc```
+#     * **output 4D**: ```errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GS```
+#     * **output TS**: ```errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GS.${ATLAS_NAME}_000.netts```
+#     * **output FC**: ```errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GS.${ATLAS_NAME}_000.netcc```
 #
 #     > **NOTE**: This pipeline is implemented in this notebook
 # ***

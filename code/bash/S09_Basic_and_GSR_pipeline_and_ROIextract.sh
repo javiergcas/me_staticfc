@@ -11,23 +11,8 @@ set -e
 
 PRJDIR='/data/SFIMJGC_HCP7T/BCBL2024/'
 PRCS_DATA_DIR=`echo ${PRJDIR}/prcs_data`
-
 SBJ_DIR=`echo ${PRCS_DATA_DIR}/${SBJ}`
-
-# NOTE: This needs to change once we re-organize folders
-# Trick to pick results for NORDIC pipeline without having to re-write other notebooks
-if [[ -z ${AFNIPROC_OUTDIR} ]]; then
-   echo "++ WARNING: Variable {AFNIPROC_OUTDIR} not provided --> setting FMRI_DATA_DIR to default value"
-   FMRI_DATA_DIR=`echo ${SBJ_DIR}/D02_Preproc_fMRI_${SES}`
-   echo "            FMRI_DATA_DIR=${FMRI_DATA_DIR}"
-else
-   FMRI_DATA_DIR=`echo ${AFNIPROC_OUTDIR}/`
-   echo "++ INFO: Setting FMRI_DATA_DIR=${FMRI_DATA_DIR} as provided via AFNIPROC_OUTDIR"
-   cd ${FMRI_DATA_DIR} 
-   ln -fs ${SBJ_DIR}/D02_Preproc_fMRI_${SES}/mask_tedana_at_least_one_echo.nii.gz ${FMRI_DATA_DIR}/mask_tedana_at_least_one_echo.nii.gz
-fi
-# End of trick
-
+FMRI_DATA_DIR=`echo ${SBJ_DIR}/D03_Preproc_${SES}_NORDIC-${NORDIC}`
 ATLAS_PATH=`echo ${ATLASES_DIR}/${ATLAS_NAME}/${ATLAS_NAME}.nii.gz`
 
 echo "++ Working on Subject ${SBJ}/${SES}... post afni proc"
@@ -35,6 +20,7 @@ echo " + PRJDIR=${PRJDIR}"
 echo " + PRCS_DATA_DIR=${PRCS_DATA_DIR}"
 echo " + SBJ_DIR=${SBJ_DIR}"
 echo " + FMRI_DATA_DIR=${FMRI_DATA_DIR}"
+echo " + ATLAS_PATH=${ATLAS_PATH}"
 echo "=============================================================================="
 
 # Enter destination folder
@@ -54,20 +40,20 @@ do
     3dcalc -overwrite                                      \
            -a pb03.${SBJ}.r01.${EC}.volreg+tlrc            \
            -b rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc    \
-           -c mask_epi_extents+tlrc                        \
+           -c ../D03_Preproc_${SES}_NORDIC-off/mask_epi_extents+tlrc                        \
            -expr 'c * min(200, a/b*100)*step(a)*step(b)'   \
            -prefix pb03.${SBJ}.r01.${EC}.volreg.scale
     rm rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc.*
 done
 
-echo "++ Compute GS in two different ways for each echo separately post volreg & scaling"
-echo "++ ==============================================================================="
+echo "++ Compute GS for each echo separately post volreg & scaling"
+echo "++ ========================================================="
 for EC in e01 e02 e03
 do
     # Global regression with no detrending prior to computing GS
     3dROIstats -quiet \
-               -mask mask_tedana_at_least_one_echo.nii.gz \
-                pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc.HEAD | awk '{print $1}' > pb03.${SBJ}.r01.${EC}.volreg.scale.GSasis.1D
+               -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz \
+                pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc.HEAD | awk '{print $1}' > pb03.${SBJ}.r01.${EC}.volreg.scale.GS.1D
 done
 
 echo "++ Denoising each echo separately (Basic & GS Pipelines)"
@@ -130,17 +116,17 @@ do
                -cenmode ${INTERP_MODE}                                                      \
                -ort X.nocensor.xmat.${EC}.1D                                                \
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic    \
-               -mask mask_tedana_at_least_one_echo.nii.gz
-    echo " + Denoising echo [${EC} | ${INTERP_MODE}] | GSasis"
-    3dTproject -overwrite                                                                 \
-               -polort 0                                                                  \
-               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                             \
-               -censor censor_${SBJ}_combined_2.1D                                        \
-               -cenmode ${INTERP_MODE}                                                    \
-               -ort X.nocensor.xmat.${EC}.1D                                              \
-               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSasis.1D                          \
-               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis \
-               -mask mask_tedana_at_least_one_echo.nii.gz
+               -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
+    echo " + Denoising echo [${EC} | ${INTERP_MODE}] | GS"
+    3dTproject -overwrite                                                             \
+               -polort 0                                                              \
+               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
+               -censor censor_${SBJ}_combined_2.1D                                    \
+               -cenmode ${INTERP_MODE}                                                \
+               -ort X.nocensor.xmat.${EC}.1D                                          \
+               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GS.1D                          \
+               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GS \
+               -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
   done
 done
 
@@ -153,15 +139,15 @@ do
                -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
                -ort X.nocensor.xmat.${EC}.1D                                          \
                -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_Basic         \
-               -mask mask_tedana_at_least_one_echo.nii.gz
-    echo " + Denoising echo [${EC} | ALL] | GSasis"
-    3dTproject -overwrite                                                             \
-               -polort 0                                                              \
-               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                         \
-               -ort X.nocensor.xmat.${EC}.1D                                          \
-               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GSasis.1D                      \
-               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_GSasis        \
-               -mask mask_tedana_at_least_one_echo.nii.gz
+               -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
+    echo " + Denoising echo [${EC} | ALL] | GS"
+    3dTproject -overwrite                                                         \
+               -polort 0                                                          \
+               -input pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc                     \
+               -ort X.nocensor.xmat.${EC}.1D                                      \
+               -ort pb03.${SBJ}.r01.${EC}.volreg.scale.GS.1D                      \
+               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_GS        \
+               -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
 done
 
 # Extract ROI Timeseries
@@ -173,10 +159,10 @@ do
   for INTERP_MODE in ZERO KILL NTRP ALL
   do
     echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising]"
-    echo "3dNetCorr -overwrite -mask mask_tedana_at_least_one_echo.nii.gz -in_rois ${ATLAS_PATH} -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}"
+    echo "3dNetCorr -overwrite -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz -in_rois ${ATLAS_PATH} -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}"
     3dNetCorr -overwrite                                                                                \
               -push_thru_many_zeros                                                                     \
-              -mask mask_tedana_at_least_one_echo.nii.gz                                                \
+              -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz                                                \
               -in_rois ${ATLAS_PATH}                                                                    \
               -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc            \
               -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}
@@ -185,27 +171,27 @@ do
                -mask ${ATLAS_PATH} \
                errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_Basic.${ATLAS_NAME}_000.netts
 
-    echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR (asis) ]"
-    3dNetCorr -overwrite                                                                                \
-              -push_thru_many_zeros                                                                     \
-              -mask mask_tedana_at_least_one_echo.nii.gz                                                \
-              -in_rois ${ATLAS_PATH}                                                                    \
-              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis+tlrc           \
-              -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}
+    echo " + Extracting ROI Timeseries and connectivity for [${EC} + Basic Denoising + GSR ]"
+    3dNetCorr -overwrite                                                                            \
+              -push_thru_many_zeros                                                                 \
+              -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz                                            \
+              -in_rois ${ATLAS_PATH}                                                                \
+              -inset  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GS+tlrc           \
+              -prefix errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GS.${ATLAS_NAME}
 
     3dROIstats -quiet                                                                                   \
                -mask ${ATLAS_PATH}                                                                      \
-               errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GSasis.${ATLAS_NAME}_000.netts
+               errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GS+tlrc > errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${INTERP_MODE}_GS.${ATLAS_NAME}_000.netts
   done
 done
 
 # Compute TSNR
 # ------------
-echo "++ Computing Full Brain TSNR for Basic and GSasis"
-echo "================================================="
+echo "++ Computing Full Brain TSNR for Basic and GS"
+echo "============================================="
 for EC in e01 e02 e03
 do
-  for SCENARIO in ALL_Basic ALL_GSasis
+  for SCENARIO in ALL_Basic ALL_GS
   do
       3dTstat -overwrite -mean -prefix rm.signal.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii pb03.${SBJ}.r01.${EC}.volreg.scale+tlrc 
       3dTstat -overwrite -stdev -prefix rm.noise.errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.nii errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}+tlrc
@@ -214,7 +200,7 @@ do
       compute_ROI_stats.tcsh                                                           \
          -out_dir    tsnr_stats_regress                                                \
          -stats_file tsnr_stats_regress/TSNR_FB_${EC}_${SCENARIO}.txt                  \
-         -dset_ROI   mask_epi_anat.${SBJ}+tlrc                                         \
+         -dset_ROI   ../D03_Preproc_${SES}_NORDIC-off/mask_epi_anat.${SBJ}+tlrc                                         \
          -dset_data  errts.${SBJ}.r01.${EC}.volreg.scale.tproject_${SCENARIO}.TSNR.nii \
          -rset_label brain                                                             \
          -rval_list  1
@@ -233,9 +219,9 @@ do
 done
 
 # Remove all the versions of GS
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_GSasis+tlrc.*
-rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL_GSasis+tlrc.*
+rm errts.${SBJ}.r01.e??.volreg.scale.tproject_NTRP_GS+tlrc.*
+rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_GS+tlrc.*
+rm errts.${SBJ}.r01.e??.volreg.scale.tproject_KILL_GS+tlrc.*
 
 # Remove the denoised data without GS regression
 rm errts.${SBJ}.r01.e??.volreg.scale.tproject_ZERO_Basic+tlrc.*

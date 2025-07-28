@@ -148,7 +148,7 @@ report_keepers_df[['e01','e02','e03']].hvplot.box()
 # # 7. Write final list of scans to disk
 
 sbj_idx = [i.split('/')[1] for i in report_keepers_df['infile'].values]
-ses_idx = [i.split('/')[2].split('_')[-1] for i in report_keepers_df['infile'].values]
+ses_idx = [i.split('/')[2].split('_')[2] for i in report_keepers_df['infile'].values]
 report_keepers_df.index = pd.MultiIndex.from_arrays([sbj_idx,ses_idx],names=['Subject','Session'])
 
 report_keepers_df.to_csv('../../../resources/good_scans.txt')

@@ -15,9 +15,9 @@
 
 # # Description
 #
-# At this point data has been pre-processed with an afni_proc script ```code/bash/S02_Afni_Preproc_ses?.CreateSwarm```, which has performed the following operations:
+# At this point data has been pre-processed with an afni_proc, which has performed the following operations:
 #
-# * Despiking, time shift correction, motion correction, registration to MNI space, masking, OC, tedana, scale and regress
+# * Despiking, time shift correction, motion correction, registration to MNI space, masking, OC, tedana (fastica and robustica), scale and regress
 # * The regression step, which takes as input ```pb05.$subj.r*.scale+tlrc.HEAD```, will include the following regressors:
 #   * motion parameters and their first derivative
 #   * compCorr physiological regressors
@@ -53,12 +53,16 @@
 #     > **NOTE**: This pipeline is implemented in this notebook
 # ***
 #
-# * **TEDANA pipepline**: This pipeline is implemented in ```NC03b_TEDANA_pipeline_and_ROIextract```
+# * **TEDANA pipepline (fastica)**:
 #
-# * **Rapidtide pipeline**: TBD
+#     * Same as **Basic** pipeline, but also includes as extra nuisance regressors components marked as "bad" by tedana (run using the fastica pipeline)
 #
-# * **MEPFM pipeline**: TBD
+# ***
 #
+# * **TEDANA pipepline (robustica)**:
+#
+#     * Same as **Basic** pipeline, but also includes as extra nuisance regressors components marked as "bad" by tedana (run using the robustica pipeline)
+#       
 # ***
 
 import pandas as pd
@@ -81,7 +85,7 @@ import os
 port_tunnel = int(os.environ['PORT2'])
 print('++ INFO: Second Port available: %d' % port_tunnel)
 
-ATLAS_NAME = 'Power264_GatingDataset'
+ATLAS_NAME = 'Power264-evaluation'
 
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 

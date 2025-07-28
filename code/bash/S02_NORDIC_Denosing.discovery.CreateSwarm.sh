@@ -7,8 +7,8 @@ DOWNLOAD_DIR=`echo ${PRJDIR}/openeuro/meica_eval/`
 SUBJECTS_DIR=`echo ${PRJDIR}/freesurfer/`
 SCRIPTS_DIR=`echo ${PRJDIR}/me_staticfc/code/matlab`
 USERNAME=`whoami`
-SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S02_NORDIC_Denosing.meica_eval.SWARM.sh`
-LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S02_NORDIC_Denosing.meica_eval.logs`
+SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S02_NORDIC_Denosing.discovery.SWARM.sh`
+LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S02_NORDIC_Denosing.discovery.logs`
 subjects=(`find ${DOWNLOAD_DIR} -name "MGSBJ*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
 sessions=(constant_gated cardiac_gated)
@@ -41,7 +41,7 @@ do
    do
        INPUT_FILE=`echo ${DOWNLOAD_DIR}/${SBJ}/${SES}/func/${SBJ}_${SES}_task-rest_echo-1_bold.nii.gz`
        if [ -f ${INPUT_FILE} ]; then
-          NORDIC_OUT_DIR=`echo ${PRCSDATA_DIR}/${SBJ}/D03_NORDIC`
+          NORDIC_OUT_DIR=`echo ${PRCSDATA_DIR}/${SBJ}/D02_NORDIC`
           if [ ! -d ${NORDIC_OUT_DIR} ]; then
              mkdir -p ${NORDIC_OUT_DIR}
           fi

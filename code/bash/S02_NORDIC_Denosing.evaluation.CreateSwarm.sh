@@ -7,8 +7,8 @@ DOWNLOAD_DIR=`echo ${PRJDIR}/openeuro/des003592-download`
 SUBJECTS_DIR=`echo ${PRJDIR}/freesurfer/`
 SCRIPTS_DIR=`echo ${PRJDIR}/me_staticfc/code/matlab`
 USERNAME=`whoami`
-SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S02_NORDIC_Denosing.SWARM.sh`
-LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S02_NORDIC_Denosing.logs`
+SWARM_PATH=`echo ${PRJDIR}/swarm.${USERNAME}/S02_NORDIC_Denosing.evaluation.SWARM.sh`
+LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S02_NORDIC_Denosing.evaluation.logs`
 subjects=(`find ${SUBJECTS_DIR} -name "sub-*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
 sessions=(ses-1 ses-2)
@@ -38,7 +38,7 @@ do
    do
        INPUT_FILE=`echo ${DOWNLOAD_DIR}/${SBJ}/${SES}/func/${SBJ}_${SES}_task-rest_echo-1_bold.nii.gz`
        if [ -f ${INPUT_FILE} ]; then
-          NORDIC_OUT_DIR=`echo ${PRCSDATA_DIR}/${SBJ}/D03_NORDIC`
+          NORDIC_OUT_DIR=`echo ${PRCSDATA_DIR}/${SBJ}/D02_NORDIC`
           if [ ! -d ${NORDIC_OUT_DIR} ]; then
              mkdir -p ${NORDIC_OUT_DIR}
           fi

@@ -16,15 +16,6 @@
 # # Description
 #
 # This notebook will use the outcome of AFNI QC reports to decide which scans we keep and which scans we will not include in sucessive analyses.
-#
-# Pre-processing of this data is done via the following scripts:
-#
-# * ```S00a_Freesurfer.CreateSwarm.sh```: runs freesurfer recon-all in all subjects
-# * ```S00b_Freesurfer2AFNI.CreateSwarm.sh```: transform freesurfer outcomes into AFNI/SUMA files
-# * ```S01_Prroc_Anat.CreateSwarm.sh```: computes spatial transformations needed to brain each subject anatomical into MNI space
-# * ```S02_Afni_Preproc_ses?.CreateSwarm.sh```: fully pre-processes the data using afni_proc.py and tedana
-#
-# Once all data has been pre-processed, this script will make use of AFNI QC tools to select scans that passed a series of criteria to be included in the remainder of the analyses
 
 # The following ```get_ss_review_table``` command will generate two tables:
 #
@@ -61,7 +52,7 @@
 #                         -report_outliers 'censor fraction' SHOW \
 #                         -write_table review_all_scans.txt \
 #                         -write_outliers review_keepers.txt -show_keepers \
-#                         -infiles ./sub-*/D02_Preproc_fMRI_ses-?/out.ss_review.*
+#                         -infiles ./sub-*/D03_Preproc_ses-?_NORDIC-off/out.ss_review.*
 # ```
 #
 # Not using this for now, as we want to have all possible motion here
@@ -84,12 +75,6 @@ from bokeh.io import output_notebook
 from bokeh.resources import INLINE
 output_notebook(INLINE)
 from utils.basics import read_gen_ss_review_table
-
-# + active=""
-# import sys
-# sys.path.append('/usr/local/apps/afni/current-py3/linux_rocky_8/')
-# from afnipy.lib_gssrt import 
-# -
 
 report_summary_path  = osp.join(PRJ_DIR,'prcs_data','review_all_scans.txt')
 report_keepers_path  = osp.join(PRJ_DIR,'prcs_data','review_keepers.txt')
@@ -167,5 +152,3 @@ ses_idx = [i.split('/')[2].split('_')[-1] for i in report_keepers_df['infile'].v
 report_keepers_df.index = pd.MultiIndex.from_arrays([sbj_idx,ses_idx],names=['Subject','Session'])
 
 report_keepers_df.to_csv('../../../resources/good_scans.txt')
-
-

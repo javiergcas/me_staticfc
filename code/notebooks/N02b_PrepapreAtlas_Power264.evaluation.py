@@ -6,12 +6,15 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.16.1
 #   kernelspec:
 #     display_name: BOLD WAVES 2024a
 #     language: python
 #     name: bold_waves_2024a
 # ---
+
+# # Description
+# This notebook will create a version of the Powers 264 altas that only contains ROIs common to the FOV of all datasets part of the evaluation dataset.
 
 from nilearn.datasets import fetch_coords_power_2011
 from utils.basics import ATLASES_DIR
@@ -19,18 +22,28 @@ import os
 import os.path as osp
 import pandas as pd
 
+# # 1. Download ROI centers for Powers 264 altas using nilearn
+
 power_atlas_info = fetch_coords_power_2011(False)
 
-power_atlas_info['rois'].head(20)
+power_atlas_info['rois'].head(5)
 
-ATLAS_NAME='Power264'
+# # 2. Create Folder for Dataset-specific version of Powers 264 atlas
+
+ATLAS_NAME='Power264-evaluation'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
 if not osp.exists(ATLAS_DIR):
     os.makedirs(ATLAS_DIR)
+    os.symlink(osp.join(ATLASES_DIR,'Power264','additional_files'),osp.join(ATLAS_DIR,'additional_files'))
+
+# # 3. Write ROI centroids to disk as csv file
 
 roi_centers_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_coords.MNI.csv')
 power_atlas_info['rois'][['x','y','z','roi']].to_csv(roi_centers_path, header=None, index=None)
+print("++ INFO: ROI Coordinates saved to disk [%s]" % roi_centers_path)
+
+# # 4. Add ROI Names and other info needed for plotting
 
 roi_info_df = power_atlas_info['rois'].copy()
 roi_info_df.columns = ['ROI_ID','pos_A','pos_R','pos_S']
@@ -67,29 +80,25 @@ roi_info_df['RGB'] = [color_map_dict[c] for c in power_atlas_addinfo['Unnamed: 3
 roi_info_df.head(5)
 # -
 
+# # 5. Create first version (still need to check for FOV) as NIFTI file
+
 # ```bash
 #     ml afni
-#     cd /data/SFIMJGC_HCP7T/BCBL2024/atlases/Power264
+#     cd /data/SFIMJGC_HCP7T/BCBL2024/atlases/Power264-evaluation
 #     3dUndump -overwrite \
-#              -prefix Power264.nii.gz \
-#              -master ../../prcs_data/sub-01/D02_Preproc_fMRI_ses-1/errts.sub-01.fanaticor+tlrc.HEAD \
+#              -prefix Power264-evaluation.nii.gz \
+#              -master ../../prcs_data/sub-01/D03_Preproc_ses-1_NORDIC-off/errts.sub-01.fanaticor+tlrc.HEAD \
 #              -xyz \
 #              -srad 5 \
-#              -xyz Power264.roi_coords.MNI.csv
+#              -xyz Power264-evaluation.roi_coords.MNI.csv
 # ```
 
-# ***
+# # 6. Create FOV masks for each dataset
 
-import pandas as pd
-from glob import glob
-import os.path as osp
-import subprocess
-import datetime
-import os
 from utils.basics import PRCS_DATA_DIR, PRJ_DIR, CODE_DIR
-ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
-
+import datetime
 import getpass
+import subprocess
 username = getpass.getuser()
 print(username)
 
@@ -97,41 +106,47 @@ dataset_info_df = pd.read_csv(osp.join(PRJ_DIR,'resources','good_scans.txt'))
 dataset_info_df = dataset_info_df.set_index(['Subject','Session'])
 print('++ Number of scans: %s scans' % dataset_info_df.shape[0])
 
-# ***
+# Create path for swarm file
 
-script_path = osp.join(PRJ_DIR,f'swarm.{username}','N02b_check_sample_FOV_vs_atlas.Power264.swarm.sh')
+script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N02b_check_sample_FOV_vs_atlas.{ATLAS_NAME}.swarm.sh')
 print(script_path)
 
-log_path = osp.join(PRJ_DIR,f'logs.{username}','N02b_check_sample_FOV_vs_atlas.Power264.log')
+# Create folder for swarm log files
+
+log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N02b_check_sample_FOV_vs_atlas.{ATLAS_NAME}.log')
 if not osp.exists(log_path):
     os.makedirs(log_path)
 print(log_path)
+
+# Create swarm file (one line per scan)
 
 with open(script_path, 'w') as the_file:
     the_file.write('# Script Creation Date: %s\n' % str(datetime.date.today()))
     the_file.write(f'# swarm -f {script_path} -g 16 -t 8 -b 5 --time 00:20:00 --logdir {log_path} --partition quick,norm --module afni\n')
     the_file.write('\n')
     for sbj,ses in list(dataset_info_df.index):
-        the_file.write(f'cd {PRCS_DATA_DIR}/{sbj}/D02_Preproc_fMRI_{ses}; 3dcalc -overwrite -a tedana_r01/adaptive_mask.nii.gz -expr "step(a)" -prefix mask_tedana_at_least_one_echo.nii.gz; 3dcalc -overwrite -a tedana_r01/adaptive_mask.nii.gz -expr "equals(a,3)" -prefix mask_tedana_allechoes.nii.gz; 3drefit -space MNI mask_tedana_at_least_one_echo.nii.gz; 3drefit -space MNI mask_tedana_allechoes.nii.gz; 3dNetCorr -overwrite -in_rois {ATLASES_DIR}/{ATLAS_NAME}/{ATLAS_NAME}.nii.gz -output_mask_nonnull -inset pb04.{sbj}.r01.combine+tlrc.HEAD -prefix rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck \n')
+        the_file.write(f'cd {PRCS_DATA_DIR}/{sbj}/D03_Preproc_{ses}_NORDIC-off; 3dcalc -overwrite -a tedana_fastica/adaptive_mask.nii.gz -expr "step(a)" -prefix mask_tedana_at_least_one_echo.nii.gz; 3dcalc -overwrite -a tedana_fastica/adaptive_mask.nii.gz -expr "equals(a,3)" -prefix mask_tedana_allechoes.nii.gz; 3drefit -space MNI mask_tedana_at_least_one_echo.nii.gz; 3drefit -space MNI mask_tedana_allechoes.nii.gz; 3dNetCorr -overwrite -in_rois {ATLASES_DIR}/{ATLAS_NAME}/{ATLAS_NAME}.nii.gz -output_mask_nonnull -inset pb04.{sbj}.r01.combine+tlrc.HEAD -prefix rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck \n')
 the_file.close()     
 
 script_path
 
 # You need to submit this as a batch job
 # ```bash
-# swarm -f /data/SFIMJGC_HCP7T/BCBL2024/swarm.javiergc/N02b_check_sample_FOV_vs_atlas.Power264.swarm.sh -g 16 -t 8 -b 5 --time 00:20:00 --logdir /data/SFIMJGC_HCP7T/BCBL2024/logs.javiergc/N02b_check_sample_FOV_vs_atlas.Power264.log --partition quick,norm --module afni
+# swarm -f /data/SFIMJGC_HCP7T/BCBL2024/swarm.javiergc/N02b_check_sample_FOV_vs_atlas.Power264.swarm-evaluation.sh -g 16 -t 8 -b 5 --time 00:20:00 --logdir /data/SFIMJGC_HCP7T/BCBL2024/logs.javiergc/N02b_check_sample_FOV_vs_atlas.Power264-evaluation.log --partition quick,norm --module afni
 # ```
 
+# # 7. Ensure all necessary files were created by the swarm job
+
 for sbj,ses in list(dataset_info_df.index):
-    expected_output_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_mask_nnull+tlrc.HEAD')
+    expected_output_path = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_mask_nnull+tlrc.HEAD')
     if not osp.exists(expected_output_path):
         print('++ WARNING: %s is missing' % expected_output_path)
 
-# ***
+# # 8. See which ROIs do not have at least 5% overlap with the imaging FOV of any subject
 
 bad_roi_list = []
 for sbj,ses in list(dataset_info_df.index):
-    roidat_path       = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_000.roidat')
+    roidat_path       = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_000.roidat')
     roidat_df         = pd.read_csv(roidat_path,sep=' ', skipinitialspace=True, header=0)
     correct_columns   = roidat_df.columns.drop(['#'])
     roidat_df         = roidat_df.drop(['ROI_label'],axis=1)
@@ -158,7 +173,7 @@ roi_info_df.to_csv(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv'), index=False
 
 roi_info_df.reset_index(drop=True)
 
-# ***
+# # 9. We create a new NIFTI file where those ROIs have been removed.
 
 bad_rois_minus = '-'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
 bad_rois_plus  = '+'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
@@ -186,8 +201,6 @@ plot_roi(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.RemovedROIs.nii.gz'),title='ROIs that
 plot_roi(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.nii.gz'),title='Original ATLAS')
 
 plot_roi(osp.join(ATLAS_DIR,f'rm.{ATLAS_NAME}.fov_restricted.nii.gz'),title='FOV-Restricted ATLAS')
-
-# ***
 
 command = f"""ml afni; \
              cd {ATLAS_DIR}; \
@@ -221,5 +234,3 @@ for n in nw_list:
 c = np.array(c)
 
 np.savetxt('../../../resources/BrainNetViewer/BrainNetViewer_Nodes_colors.txt',c, fmt='%0.4f', delimiter=',')
-
-

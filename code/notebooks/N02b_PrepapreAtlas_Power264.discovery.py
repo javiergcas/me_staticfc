@@ -36,7 +36,7 @@ power_atlas_info['rois'].head(5)
 
 # # 2. Create Folder for Dataset-specific version of Powers 264 atlas
 
-ATLAS_NAME='Power264_GatingDataset'
+ATLAS_NAME='Power264-discovery'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 print(ATLAS_DIR)
 
@@ -87,20 +87,20 @@ roi_info_df['RGB'] = [color_map_dict[c] for c in power_atlas_addinfo['Unnamed: 3
 roi_info_df.head(5)
 # -
 
-# # 6. Create first version (still need to check for FOV) as NIFTI file
+# # 5. Create first version (still need to check for FOV) as NIFTI file
 
 # ```bash
 #     ml afni
-#     cd /data/SFIMJGC_HCP7T/BCBL2024/atlases/Power264_GatingDataset
+#     cd /data/SFIMJGC_HCP7T/BCBL2024/atlases/Power264-discovery
 #     3dUndump -overwrite \
-#              -prefix Power264_GatingDataset.nii.gz \
-#              -master ../../prcs_data/MGSBJ01/D02_Preproc_fMRI_cardiac_gated/errts.MGSBJ01.fanaticor+tlrc.HEAD \
+#              -prefix Power264-discovery.nii.gz \
+#              -master ../../prcs_data/MGSBJ01/D03_Preproc_cardiac_gated_NORDIC-off/errts.MGSBJ01.fanaticor+tlrc.HEAD \
 #              -xyz \
 #              -srad 5 \
-#              -xyz Power264_GatingDataset.roi_coords.MNI.csv
+#              -xyz Power264-discovery.roi_coords.MNI.csv
 # ```
 
-# # 7. Create FOV masks for each dataset
+# # 6. Create FOV masks for each dataset
 
 from utils.basics import PRCS_DATA_DIR, PRJ_DIR, CODE_DIR
 import datetime
@@ -108,27 +108,6 @@ import getpass
 import subprocess
 username = getpass.getuser()
 print(username)
-
-# + active=""
-# import pandas as pd
-# from glob import glob
-# import os.path as osp
-# import subprocess
-# import datetime
-# import os
-# from utils.basics import PRCS_DATA_DIR, PRJ_DIR, CODE_DIR
-# ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
-
-# + active=""
-# import getpass
-# username = getpass.getuser()
-# print(username)
-
-# + active=""
-# dataset_info_df = pd.read_csv(osp.join(PRJ_DIR,'resources','good_scans.txt'))
-# dataset_info_df = dataset_info_df.set_index(['Subject','Session'])
-# print('++ Number of scans: %s scans' % dataset_info_df.shape[0])
-# -
 
 # Create path for swarm file
 
@@ -150,7 +129,7 @@ with open(script_path, 'w') as the_file:
     the_file.write('\n')
     for sbj in sbj_list:
         for ses in ses_list:
-            the_file.write(f'cd {PRCS_DATA_DIR}/{sbj}/D02_Preproc_fMRI_{ses}; 3dcalc -overwrite -a tedana_r01/adaptive_mask.nii.gz -expr "step(a)" -prefix mask_tedana_at_least_one_echo.nii.gz; 3dcalc -overwrite -a tedana_r01/adaptive_mask.nii.gz -expr "equals(a,3)" -prefix mask_tedana_allechoes.nii.gz; 3drefit -space MNI mask_tedana_at_least_one_echo.nii.gz; 3drefit -space MNI mask_tedana_allechoes.nii.gz; 3dNetCorr -overwrite -in_rois {ATLASES_DIR}/{ATLAS_NAME}/{ATLAS_NAME}.nii.gz -output_mask_nonnull -inset pb04.{sbj}.r01.combine+tlrc.HEAD -prefix rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck \n')
+            the_file.write(f'cd {PRCS_DATA_DIR}/{sbj}/D03_Preproc_{ses}_NORDIC-off; 3dcalc -overwrite -a tedana_fastica/adaptive_mask.nii.gz -expr "step(a)" -prefix mask_tedana_at_least_one_echo.nii.gz; 3dcalc -overwrite -a tedana_fastica/adaptive_mask.nii.gz -expr "equals(a,3)" -prefix mask_tedana_allechoes.nii.gz; 3drefit -space MNI mask_tedana_at_least_one_echo.nii.gz; 3drefit -space MNI mask_tedana_allechoes.nii.gz; 3dNetCorr -overwrite -in_rois {ATLASES_DIR}/{ATLAS_NAME}/{ATLAS_NAME}.nii.gz -output_mask_nonnull -inset pb04.{sbj}.r01.combine+tlrc.HEAD -prefix rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck \n')
 the_file.close()     
 
 script_path
@@ -158,23 +137,23 @@ script_path
 # For this dataset, because the number of scans is so small, it might be ok to just run it a console. That said, if you want to still parallelize, here is the swarm call
 #
 # ```bash
-# swarm -f /data/SFIMJGC_HCP7T/BCBL2024/swarm.javiergc/N02b_check_sample_FOV_vs_atlas.Power264_GatingDataset.swarm.sh -g 16 -t 8 -b 5 --time 00:10:00 --logdir /data/SFIMJGC_HCP7T/BCBL2024/logs.javiergc/N02b_check_sample_FOV_vs_atlas.Power264_GatingDataset.log --partition quick,norm --module afni
+# swarm -f /data/SFIMJGC_HCP7T/BCBL2024/swarm.javiergc/N02b_check_sample_FOV_vs_atlas.Power264-discovery.sh -g 16 -t 8 -b 5 --time 00:10:00 --logdir /data/SFIMJGC_HCP7T/BCBL2024/logs.javiergc/N02b_check_sample_FOV_vs_atlas.Power264-discovery.log --partition quick,norm --module afni
 # ```
 
-# # 8. Ensure all necessary files were created by the swarm job
+# # 7. Ensure all necessary files were created by the swarm job
 
 for sbj in sbj_list:
     for ses in ses_list:
-        expected_output_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_mask_nnull+tlrc.HEAD')
+        expected_output_path = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_mask_nnull+tlrc.HEAD')
         if not osp.exists(expected_output_path):
             print('++ WARNING: %s is missing' % expected_output_path)
 
-# # 9. See which ROIs do not have at least 5% overlap with the imaging FOV of any subject
+# # 8. See which ROIs do not have at least 5% overlap with the imaging FOV of any subject
 
 bad_roi_list = []
 for sbj in sbj_list:
     for ses in ses_list:
-        roidat_path       = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_000.roidat')
+        roidat_path       = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_000.roidat')
         roidat_df         = pd.read_csv(roidat_path,sep=' ', skipinitialspace=True, header=0)
         correct_columns   = roidat_df.columns.drop(['#'])
         roidat_df         = roidat_df.drop(['ROI_label'],axis=1)
@@ -203,7 +182,7 @@ roi_info_df.to_csv(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv'), index=False
 
 roi_info_df.reset_index(drop=True)
 
-# # 10. We create a new NIFTI file where those ROIs have been removed.
+# # 9. We create a new NIFTI file where those ROIs have been removed.
 
 bad_rois_minus = '-'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
 bad_rois_plus  = '+'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
@@ -238,7 +217,7 @@ command = f"""ml afni; \
 output  = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
 print(output.strip().decode())
 
-# # 11. Prepare Files for BrainNetViewer
+# # 10. Prepare Files for BrainNetViewer
 #
 # The first file will be loaded as node
 #
@@ -263,3 +242,5 @@ for n in nw_list:
 c = np.array(c)
 
 np.savetxt(f'../../../resources/BrainNetViewer/{ATLAS_NAME}.BrainNetViewer_Nodes_colors.txt',c, fmt='%0.4f', delimiter=',')
+
+

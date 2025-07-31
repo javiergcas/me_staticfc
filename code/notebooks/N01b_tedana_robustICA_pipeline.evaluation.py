@@ -51,8 +51,8 @@ with open(script_path, 'w') as the_file:
     the_file.write(f'# swarm -f {script_path} -g 64 -t 8 -b 4 --time 00:50:00 --logdir {log_path} --partition quick,norm --module afni\n')
     the_file.write('\n')
     for sbj,ses in list(dataset_info_df.index):
-        the_file.write(f'export SBJ={sbj} SES={ses} NORDIC=on; sh  {CODE_DIR}/bash/S08_tedana-robustICA.sh \n')
-        the_file.write(f'export SBJ={sbj} SES={ses} NORDIC=off; sh  {CODE_DIR}/bash/S08_tedana-robustICA.sh \n')
+        the_file.write(f'export SBJ={sbj} SES={ses} DATASET=evaluation NORDIC=on; sh  {CODE_DIR}/bash/S08_tedana-robustICA.sh \n')
+        the_file.write(f'export SBJ={sbj} SES={ses} DATASET=evaluation NORDIC=off; sh  {CODE_DIR}/bash/S08_tedana-robustICA.sh \n')
 the_file.close()     
 
 script_path

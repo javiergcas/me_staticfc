@@ -33,11 +33,18 @@ if [ -d tedana_robustica ]; then
 fi
 pwd 
 
+if [[ "${DATASET}" == "discovery" ]]; then 
+   ECHOTIMES="13.9 31.7 49.5" 
+else 
+   ECHOTIMES="13.7 30.0 47.0" 
+fi
+echo "++ Dataset Type = ${DATASET} --> Echo Times = ${ECHOTIMES}"
+
 # Run tedana with robustica
 tedana -d pb03.${SBJ}.r01.e01.volreg+tlrc.HEAD \
           pb03.${SBJ}.r01.e02.volreg+tlrc.HEAD \
           pb03.${SBJ}.r01.e03.volreg+tlrc.HEAD \
-        -e 13.9 31.7 49.5                      \
+        -e ${ECHOTIMES}                        \
         --mask mask_epi_anat.${SBJ}+tlrc.HEAD  \
         --verbose                              \
         --out-dir tedana_robustica             \

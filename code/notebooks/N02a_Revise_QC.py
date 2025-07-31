@@ -85,6 +85,24 @@ report_keepers_path  = osp.join(PRJ_DIR,'prcs_data','review_keepers.txt')
 
 report_summary_df = read_gen_ss_review_table(report_summary_path)
 
+# ### Information about what scans we do not consider
+#
+# #### a) Those that failed the anatomical - EPI alingment
+
+ge_scans = report_summary_df[(report_summary_df['e01']==13.7)]
+
+ge_scans[ge_scans['anat/EPI mask Dice coef']<.88] 
+
+# #### b) Those that had slightly different voxel size
+
+ge_scans[ge_scans['orig Dy']>3.0]
+
+# #### c) Those that had a different number of datapoints.
+
+ge_scans['num TRs per run'].value_counts()
+
+# ***
+
 # As we shall see in later notebooks, there will be three subjects for whom one scan passed criteria and another one did not. The next three cells show that the cause for that is the EPI/anat overlap being below 0.88
 
 report_summary_df.set_index('subject ID').loc['sub-12']

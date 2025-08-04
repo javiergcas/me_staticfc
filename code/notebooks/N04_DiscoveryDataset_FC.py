@@ -43,10 +43,12 @@ import pickle
 
 # ***
 
-echo_times_dict = TES_MSEC['Gating']
-ses_list        = SESSIONS['Gating']
+DATASET='discovery'
 
-ATLAS_NAME = 'Power264_GatingDataset'
+echo_times_dict = TES_MSEC[DATASET]
+ses_list        = SESSIONS[DATASET]
+
+ATLAS_NAME = f'Power264-{DATASET}'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
 sbj_list = ['MGSBJ01',  'MGSBJ02',  'MGSBJ03',  'MGSBJ04',  'MGSBJ05',  'MGSBJ06',  'MGSBJ07']
@@ -86,21 +88,16 @@ power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0]
 # This cell will load ROI Timeseries, compute R and C, and place these into a dictionary of datafrmes. It will do this for the Basic denoising pipeline (Basic) and no censoring (ALL).
 
 pp_opts = {'No Censoring | Basic':'ALL_Basic',
-       'No Censoring | GSR':'ALL_GSasis',
-       'No Censoring | Tedana':'ALL_Tedana'}
-nordic_opts={'Do not use':'Off', 'Active':'On'}
+       'No Censoring | GSR':'ALL_GS',
+       'No Censoring | Tedana (fastica)':'ALL_Tedana-fastica',
+       'No Censoring | Tedana (robustica)':'ALL_Tedana-robustica'}
+nordic_opts={'Do not use':'off', 'Active':'on'}
 data_fc = {}
 
 for sbj,ses in tqdm(list(dataset_info_df.index)):
         for pp in pp_opts.values():
             for nordic in nordic_opts.values():
-                # Compose Dfolder name
-                if nordic == 'Off':
-                    d_folder = f'D02_Preproc_fMRI_{ses}'
-                if nordic == 'On':
-                    d_folder = f'D04_Preproc_fMRI_{ses}_NORDIC'
-                #if nordic == 'NORDIC_FixNComps':
-                #    d_folder = f'D05_Preproc_fMRI_{ses}_{nordic}'
+                d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
                 for (e_x,e_y) in echo_pairs_tuples:
                     # Compose path to input TS
                     roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{pp}.{ATLAS_NAME}_000.netts')
@@ -120,15 +117,13 @@ for sbj,ses in tqdm(list(dataset_info_df.index)):
 
 motion_df = pd.DataFrame(index=dataset_info_df.index, columns=['Avg. Mot.','Max. Mot.'])
 for sbj,ses in tqdm(list(dataset_info_df.index)):
-    qc_summary_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'out.ss_review.{sbj}.txt')
+    qc_summary_path = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'out.ss_review.{sbj}.txt')
     qc_summary = pd.read_csv(qc_summary_path,sep=':', header=None)
     qc_summary.columns = ['Metric','Value']
     qc_summary.set_index('Metric',inplace=True)
     qc_summary.index = [i.replace(' ','') for i in qc_summary.index]
     motion_df.loc[(sbj,ses),'Avg. Mot.'] = float(qc_summary.loc['averagemotion(perTR)'].values[0])
     motion_df.loc[(sbj,ses),'Max. Mot.'] = float(qc_summary.loc['maxmotiondisplacement'].values[0])
-
-motion_df.sort_values(by='Max. Mot.')
 
 # ***
 #
@@ -143,7 +138,7 @@ qa_xr = xr.DataArray(dims=['sbj','ses','pp','nordic','fc_metric','ee_vs_ee','qc_
                              'ee_vs_ee':pairs_of_echo_pairs,
                              'qc_metric':['dBOLD','dSo','pBOLD','pSo']})
 
-for sbj in tqdm(sbj_list):
+for sbj in tqdm(sbj_list, desc='Subjects'):
     for ses in  ses_list:
         partial_key = (sbj, ses)
         sbj_ses_in_fc = any(key[:len(partial_key)] == partial_key for key in data_fc)
@@ -179,29 +174,22 @@ for sbj in tqdm(sbj_list):
 # ***
 # # Tedana derived metrics
 
-# +
-other_stats = {'Off': pd.DataFrame(columns=['Likely BOLD | Var','Unlikely BOLD | Var', 'Likely BOLD | #ICs','Unlikely BOLD | #ICs'], index=dataset_info_df.index),
-               'On': pd.DataFrame(columns=['Likely BOLD | Var','Unlikely BOLD | Var', 'Likely BOLD | #ICs','Unlikely BOLD | #ICs'], index=dataset_info_df.index)}
-# Results when NORDIC is Off
-for sbj in sbj_list:
+other_stats = pd.DataFrame(columns=['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic','Value'])
+other_stats = other_stats.set_index(['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic'])
+for sbj in tqdm(sbj_list, desc='Subjects'):
     for ses in ses_list:
         for nordic in nordic_opts.values():
-            if nordic == 'Off':
-                d_folder = f'D02_Preproc_fMRI_{ses}'
-            if nordic == 'On':
-                d_folder = f'D04_Preproc_fMRI_{ses}_NORDIC'
-            ica_metrics_path         = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tedana_r01','ica_metrics.tsv')
-            ica_metrics              = pd.read_csv(ica_metrics_path, sep='\t').set_index('Component')
-            likely_bold_components   = list(ica_metrics[ica_metrics['classification_tags']=='Likely BOLD'].index)
-            unlikely_bold_components = list(ica_metrics[ica_metrics['classification_tags']=='Unlikely BOLD'].index)
-            other_stats[nordic].loc[(sbj,ses),'Likely BOLD | Var']    = ica_metrics.loc[likely_bold_components,'variance explained'].sum().round(2)
-            other_stats[nordic].loc[(sbj,ses),'Unlikely BOLD | Var']  = ica_metrics.loc[unlikely_bold_components,'variance explained'].sum().round(2)
-            other_stats[nordic].loc[(sbj,ses),'Likely BOLD | #ICs']   = len(likely_bold_components)
-            other_stats[nordic].loc[(sbj,ses),'Unlikely BOLD | #ICs'] = len(unlikely_bold_components)
+            d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
+            for tedana_type in ['fastica','robustica']:
+                ica_metrics_path         = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'tedana_{tedana_type}','ica_metrics.tsv')
+                ica_metrics              = pd.read_csv(ica_metrics_path, sep='\t').set_index('Component')
+                likely_bold_components   = list(ica_metrics[ica_metrics['classification_tags']=='Likely BOLD'].index)
+                unlikely_bold_components = list(ica_metrics[ica_metrics['classification_tags']=='Unlikely BOLD'].index)
 
-other_stats['Off'] = other_stats['Off'].infer_objects()
-other_stats['On']  = other_stats['On'].infer_objects()
-# -
+                other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','Summed Variance']   = ica_metrics.loc[likely_bold_components,'variance explained'].sum().round(2)
+                other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','Summed Variance'] = ica_metrics.loc[unlikely_bold_components,'variance explained'].sum().round(2)
+                other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','#ICs']              = len(likely_bold_components)
+                other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','#ICs']            = len(unlikely_bold_components)
 
 # ***
 #
@@ -237,10 +225,10 @@ sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Di
 @pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select)
 def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim,show_stats,stat_test,annot_type):
     if plot_type == 'hexbin':
-        frame = fc_across_echoes_scatter_page(data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats[nordic], hexbin=True)
+        frame = fc_across_echoes_scatter_page(DATASET,data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=True)
         return frame
     if plot_type == 'scatter':
-        frame = fc_across_echoes_scatter_page(data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats[nordic], hexbin=False)
+        frame = fc_across_echoes_scatter_page(DATASET,data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=False)
         return frame
     if plot_type == 'FCmats':
         fcR = get_fc_matrices(data_fc,qa_xr,sbj,ses, nordic, 'R', net_cmap=power264_nw_cmap)
@@ -253,11 +241,11 @@ def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_
             layout.append(fcR)
         return layout
     if plot_type == 'group_res_static':
-        a = pn.Card(get_barplot_discovery_dataset(qa_xr,'On',fc_metric,'pBOLD',   hue='Pre-processing',x='Session',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),
-                    get_barplot_discovery_dataset(qa_xr,'On',fc_metric,'pBOLD',  hue='Session',x='Pre-processing',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),
+        a = pn.Card(get_barplot_discovery_dataset(qa_xr,'on',fc_metric,'pBOLD',   hue='Pre-processing',x='Session',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),
+                    get_barplot_discovery_dataset(qa_xr,'on',fc_metric,'pBOLD',  hue='Session',x='Pre-processing',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),
                     title='Results of Speng Sample (1) | NORDIC On')
-        b = pn.Card(get_barplot_discovery_dataset(qa_xr,'Off',fc_metric,'pBOLD',   hue='Pre-processing',x='Session',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),
-                    get_barplot_discovery_dataset(qa_xr,'Off',fc_metric,'pBOLD',  hue='Session',x='Pre-processing',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),
+        b = pn.Card(get_barplot_discovery_dataset(qa_xr,'off',fc_metric,'pBOLD',   hue='Pre-processing',x='Session',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),
+                    get_barplot_discovery_dataset(qa_xr,'off',fc_metric,'pBOLD',  hue='Session',x='Pre-processing',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),
                     title='Results of Speng Sample (1) | NORDIC Off')
         return pn.Row(a,b)
         #a = pn.Card(get_barplot(qa_xr,nordic,fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, legend_location='lower left'),title='Results of Speng Sample (1)')

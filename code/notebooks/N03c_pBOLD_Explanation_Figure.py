@@ -28,7 +28,7 @@ from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR
 from sfim_lib.plotting.fc_matrices import hvplot_fc
 from itertools import combinations_with_replacement, combinations
-ATLAS_NAME = 'Power264_GatingDataset'
+ATLAS_NAME = 'Power264-discovery'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 import panel as pn
 pn.extension()
@@ -59,7 +59,11 @@ echo_times_dict = {'e01':13.9,'e02':31.7, 'e03':49.5}
 # Representative scan used when submitting the abstract to OHBM 2025
 good_scan = ('MGSBJ07','constant_gated')
 bad_scan  = ('MGSBJ07', 'cardiac_gated')
-sample_scans = [good_scan, bad_scan, ('MGSBJ05','constant_gated')]
+sample_scans = [good_scan, bad_scan, ('MGSBJ05','constant_gated'),('MGSBJ05','cardiac_gated'), 
+                ('MGSBJ01','constant_gated'),('MGSBJ01','cardiac_gated'),
+                ('MGSBJ02','constant_gated'),('MGSBJ02','cardiac_gated'),
+                ('MGSBJ03','constant_gated'),('MGSBJ03','cardiac_gated'),
+                ('MGSBJ04','constant_gated'),('MGSBJ04','cardiac_gated')]
 sample_scans_select = {'constant gating':good_scan, 'cardiac gating':bad_scan}
 
 # # 1. Load Atlas Information
@@ -84,16 +88,19 @@ power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0]
 #
 # This cell will load ROI Timeseries, compute R and C, and place these into a dictionary of datafrmes. It will do this for the Basic denoising pipeline (Basic) and no censoring (ALL).
 
-scenarios             = ['ALL_Basic','ALL_GSasis','ALL_Tedana']
-scenarios_select_dict = {'No Censoring | Basic':'ALL_Basic','No Censoring | GSR':'ALL_GSasis','No Censoring | tedana':'ALL_Tedana'}
+scenarios             = ['ALL_Basic','ALL_GS','ALL_Tedana-fastica','ALL_Tedana-robustica']
+scenarios_select_dict = {'No Censoring | Basic':'ALL_Basic',
+                         'No Censoring | GSR':'ALL_GS',
+                         'No Censoring | tedana (fastica)':'ALL_Tedana-fastica',
+                         'No Censoring | tedana (robustica)':'ALL_Tedana-robustica'}
 fc = {}
 
 for (sbj,ses) in sample_scans:
     for scenario in scenarios:
         for (e_x,e_y) in tqdm(echo_pairs_tuples, desc=scenario):
-            roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
+            roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
             roi_ts_x      = np.loadtxt(roi_ts_path_x)
-            roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
+            roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
             roi_ts_y      = np.loadtxt(roi_ts_path_y)
             aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
             aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
@@ -113,7 +120,7 @@ scenarioB_select = pn.widgets.Select(name='Right Configuration', options=scenari
 conf_card        = pn.Card(scan_select,scenarioA_select,scenarioB_select, title='Configuration')
 
 
-def plot_matrix(scan,scenario,fc_metric='R',echo_pair=('e02','e02'), title=''):
+def plot_matrix(scan,scenario,fc_metric='C',echo_pair=('e01','e02'), title=''):
     sbj_id = scan[0]
     run_id = scan[1]
     data   = fc[fc_metric,sbj_id,run_id,scenario,echo_pair]
@@ -134,6 +141,180 @@ dashboard = pn.Row(conf_card,plot_left_matrix, plot_right_matrix)
 dashboard_server = dashboard.show(port=port_tunnel)
 
 dashboard_server.stop()
+
+sbj_id = 'MGSBJ05'
+run_id = 'constant_gated'
+data   = fc['C',sbj_id,run_id,'ALL_Basic',('e01','e02')]
+plot   = hvplot_fc(data,major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
+         cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left',clim=(-.3,.3),
+         cbar_title=f"FC: Covariance", cbar_title_fontsize=14, ticks_font_size=14).opts(tools=[])
+plot
+
+# # Figure 1 - Non-BOLD Data demonstration
+
+# +
+sbj='MGSBJ03'
+ses='cardiac_gated'
+zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
+
+a  = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e01','e02')].values,discard_diagonal=True)
+b  = a + 0.1 * (np.random.normal(0,.25,25425))
+df = pd.DataFrame([a,b], index=['C(TE1,TE2)','C(TE1,TE3)']).T
+plot_simulation = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TEi,TEj)', ylabel='C(TEk,TEl)', xlim=(-.1,1.5), ylim=(-.1,1.5)).opts(fontscale=1.2, title='(a) Simulation') * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * zero_marker
+
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e01','e03')].values,discard_diagonal=True)
+df = pd.DataFrame([a,c], index=['C(TE1,TE2)','C(TE1,TE3)']).T
+plot_real_data = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TE1,TE2)', ylabel='C(TE1,TE3)', xlim=(-.1,1.5), ylim=(-.1,1.5)).opts(fontscale=1.2, title='(b) Real Data') * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * zero_marker
+output = pn.Column(plot_simulation + plot_real_data)
+output
+# -
+
+# # Figure 1 - BOLD Data demonstration
+
+slope = (echo_times_dict['e02'] * echo_times_dict['e03']) / (echo_times_dict['e01'] * echo_times_dict['e02'])
+slope
+
+# +
+sbj='MGSBJ03'
+ses='constant_gated'
+zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
+
+a  = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-robustica',('e01','e02')].values,discard_diagonal=True)
+b  = (slope * a) + 0.1 * (np.random.normal(0,.25,25425))
+df = pd.DataFrame([a,b], index=['C(TE1,TE2)','C(TE1,TE3)']).T
+plot_simulation = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TEi,TEj)', ylabel='C(TEk,TEl)', xlim=(-.6,.6), ylim=(-.6,.6)).opts(fontscale=1.2, title='(c) Simulation') * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * hv.Slope(slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * zero_marker
+
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-robustica',('e02','e03')].values,discard_diagonal=True)
+df = pd.DataFrame([a,c], index=['C(TE1,TE2)','C(TE2,TE3)']).T
+plot_real_data = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE2,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TE1,TE2)', ylabel='C(TE2,TE3)', xlim=(-.6,.6), ylim=(-.6,.6)).opts(fontscale=1.2, title='(d) Real Data') * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * hv.Slope(slope,0).opts(line_color='g',line_dash='dashed',line_width=2) *zero_marker
+output = pn.Column(plot_simulation + plot_real_data)
+output
+# -
+
+# # Figure 2.a - Demonstration of heteroscedasticity
+
+# +
+x_te1,x_te2 = 'e01','e02'
+y_te1,y_te2 = 'e02','e03'
+a = sym_matrix_to_vec(fc['C','MGSBJ05','constant_gated','ALL_Tedana-robustica',(x_te1,x_te2)].values,discard_diagonal=True)
+b = sym_matrix_to_vec(fc['C','MGSBJ05','constant_gated','ALL_Tedana-robustica',(y_te1,y_te2)].values,discard_diagonal=True)
+df = pd.DataFrame([a,b], index=['C(TE1,TE2)','C(TE2,TE3)']).T
+
+zero_point = hv.HLine(0).opts(line_width=0.5, line_color='k', line_dash='dotted') * hv.VLine(0).opts(line_width=0.5, line_color='k', line_dash='dotted')
+
+scat_datashaded = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE2,TE3)', aspect='square', xlim=(-.1,.5), ylim=(-.1,.5), datashade=True).opts(title='(a) Real Data')
+scat = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE2,TE3)', aspect='square', xlim=(-.1,.5), ylim=(-.1,.5))
+
+nonBOLD_line = hv.Slope(1,0).opts(line_width=3, line_color='r', line_dash='dashed')
+BOLD_line = hv.Slope((echo_times_dict[y_te1]*echo_times_dict[y_te2])/(echo_times_dict[x_te1]*echo_times_dict[x_te2]),0).opts(line_width=3, line_color='g', line_dash='dashed') 
+
+data_fit = np.polyfit(a,b,1)
+
+data_line = hv.Slope(data_fit[0],data_fit[1]).opts(line_width=3, line_color='b', line_dash='dashed') 
+print(data_fit)
+# -
+
+(scat_datashaded * zero_point) 
+
+(scat_datashaded * nonBOLD_line * zero_point)
+
+print((echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02']))
+(scat_datashaded * nonBOLD_line * BOLD_line * zero_point)
+
+# # Figure 2.a Describing the Heterocedasticity issue
+
+print(data_fit[0],data_fit[1])
+(scat_datashaded * nonBOLD_line * BOLD_line * data_line * zero_point)
+
+# +
+from statsmodels.stats.diagnostic import het_breuschpagan
+from statsmodels.formula.api import ols
+import statsmodels.api as sm
+import statsmodels.stats.diagnostic as diag
+
+X = a
+# Add a constant for the intercept
+X_const = sm.add_constant(X)
+model = sm.OLS(b, X_const).fit()
+
+# Run Breusch-Pagan test
+# The function takes residuals and design matrix (exog)
+test_stat, p_value, _, _ = het_breuschpagan(model.resid, model.model.exog)
+
+print(f"Breusch-Pagan test statistic: {test_stat:.3f}")
+print(f"P-value: {p_value:.3f}")
+
+# -
+
+df2=pd.DataFrame([model.fittedvalues,model.resid], index=['Fitted','Residuals']).T
+
+# +
+import pandas as pd
+import holoviews as hv
+import hvplot.pandas  # ensure hvplot is imported to extend pandas
+from statsmodels.nonparametric.smoothers_lowess import lowess
+
+hv.extension('bokeh')
+
+# Compute LOWESS smoother
+smoothed = lowess(df2['Residuals'], df2['Fitted'], frac=0.3)
+smooth_df = pd.DataFrame(smoothed, columns=['Fitted', 'Residuals'])
+
+# Scatter plot of residuals
+scatter = df2.hvplot.scatter(x='Fitted', y='Residuals', alpha=0.7, size=3, color='k', datashade=True, ylim=(-.1,.2), xlim=(-.1,.2))
+
+# Smoothed curve
+smooth_curve = smooth_df.hvplot.line(x='Fitted', y='Residuals', color='red', name='LOWESS Fit')
+
+# Horizontal zero line
+zero_line = hv.HLine(0).opts(color='black', line_dash='dashed', line_width=0.5)
+
+# Combine plots
+(scatter * smooth_curve * zero_line).opts(
+    title='(b) Fitted Values vs. Residuals & LOWESS line',
+    width=600, height=400,
+    xlabel='Fitted values', ylabel='Residuals')
+# -
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ***
 
@@ -212,7 +393,7 @@ np.random.seed(50)
 sample_pairs = np.random.choice(echo_pairs,2,False)
 print(sample_pairs)
 plots = pn.Row()
-for (sbj,ses),scenario, label in zip([good_scan,bad_scan],['ALL_Tedana','ALL_Basic'],['Const. Gated,Tedana -> BOLD Dominated','Cardiac Gated,Basic -> Non-BOLD Dominated']):
+for (sbj,ses),scenario, label in zip([good_scan,bad_scan],['ALL_Tedana-fastica','ALL_Basic'],['Const. Gated,Tedana -> BOLD Dominated','Cardiac Gated,Basic -> Non-BOLD Dominated']):
     aux_fc_x = sym_matrix_to_vec(fc['R',sbj, ses, scenario,tuple(sample_pairs[0].split('|'))].values,discard_diagonal=True)
     aux_fc_y = sym_matrix_to_vec(fc['R',sbj, ses, scenario,tuple(sample_pairs[1].split('|'))].values,discard_diagonal=True)
     e1_X,e2_X = sample_pairs[0].split('|')
@@ -285,7 +466,7 @@ np.random.seed(51)
 sample_pairs = np.random.choice(echo_pairs,2,False)
 print(sample_pairs)
 plots = pn.Row()
-for (sbj,ses),scenario, label in zip([good_scan,bad_scan],['ALL_Tedana','ALL_Basic'],['Const. Gated,Tedana -> BOLD Dominated','Cardiac Gated,Basic -> Non-BOLD Dominated']):
+for (sbj,ses),scenario, label in zip([good_scan,bad_scan],['ALL_Tedana-fastica','ALL_Basic'],['Const. Gated,Tedana -> BOLD Dominated','Cardiac Gated,Basic -> Non-BOLD Dominated']):
     aux_fc_x = sym_matrix_to_vec(fc['C',sbj, ses, scenario,tuple(sample_pairs[0].split('|'))].values,discard_diagonal=True)
     aux_fc_y = sym_matrix_to_vec(fc['C',sbj, ses, scenario,tuple(sample_pairs[1].split('|'))].values,discard_diagonal=True)
     # Allow line to not go thorugh zero
@@ -314,12 +495,12 @@ plots
 
 # +
 zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
-a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
+a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana-fastica',('e01','e02')].values,discard_diagonal=True)
 b = a + 0.1 * (np.random.rand(25425) - .5)
 df = pd.DataFrame([a,b], index=['FC-R (TE1,TE2)','FC-R (TE1,TE3)']).T
-plot_simulation = df.hvplot.scatter(x='FC-R (TE1,TE2)',y='FC-R (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-R (TEi,TEj)', ylabel='FC-R (TEk,TEl)').opts(fontscale=1.5, title='Simulated behavior for FC-R') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
+plot_simulation = df.hvplot.scatter(x='FC-R (TE1,TE2)',y='FC-R (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-R (TEi,TEj)', ylabel='FC-R (TEk,TEl)').opts(fontscale=1.5, title='Simulated behavior for FC-R')  * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
 
-c = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e01','e03')].values,discard_diagonal=True)
+c = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana-fastica',('e01','e03')].values,discard_diagonal=True)
 df = pd.DataFrame([a,c], index=['FC-R (TE1,TE2)','FC-R (TE1,TE3)']).T
 plot_real_data = df.hvplot.scatter(x='FC-R (TE1,TE2)',y='FC-R (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-R (TE1,TE2)', ylabel='FC-R (TE1,TE3)').opts(fontscale=1.5, title='Empirical data') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
 
@@ -335,8 +516,30 @@ output = pn.Column(header,plot_simulation + plot_real_data)
 output
 
 # +
-a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana',('e01','e02')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana',('e02','e03')].values,discard_diagonal=True)
+zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
+a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e02')].values,discard_diagonal=True)
+b = a + 0.1 * (np.random.rand(25425) - .5)
+df = pd.DataFrame([a,b], index=['C(TE1,TE2)','C(TE1,TE3)']).T
+plot_simulation = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TEi,TEj)', ylabel='C(TEk,TEl)', xlim=(-.1,.4), ylim=(-.1,.6)).opts(fontscale=1.2, title='(a) Simulation') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
+
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e03')].values,discard_diagonal=True)
+df = pd.DataFrame([a,c], index=['C(TE1,TE2)','C(TE1,TE3)']).T
+plot_real_data = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TE1,TE2)', ylabel='C(TE1,TE3)', xlim=(-.1,.4), ylim=(-.1,.6)).opts(fontscale=1.2, title='(b) Real Data') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
+
+header = pn.pane.Markdown("""
+# Exmaple of how FC-C is expected to behave across echoes. \n
+
+Theory says that independenly of what noise source dominates the data, FC-R should be echo time independent. The simulation on the left,
+and the represenative data on the right shows this behavior in the form of a scatter plot of FC-R between two different echo combinations.
+As FC-R is expected to be echo independent, data sits approximately on the identity line (Slope=1, Intercept=0) plot_simulation + plot_real_data""", width=800)
+
+output = pn.Column(header,plot_simulation + plot_real_data)
+#output.save('../../results/FCR_theoretical_behavior_across_echoes.html')
+output
+
+# +
+a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e02')].values,discard_diagonal=True)
+b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e02','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -346,7 +549,7 @@ plot_simulation = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspec
                   hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
                   zero_marker
 
-c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana',('e01','e03')].values,discard_diagonal=True)
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e01']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE1,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -364,8 +567,8 @@ output.save('../../results/FCC_theoretical_behavior_across_echoes.html')
 output
 
 # +
-a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GSasis',('e01','e02')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GSasis',('e02','e03')].values,discard_diagonal=True)
+a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GS',('e01','e02')].values,discard_diagonal=True)
+b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GS',('e02','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
@@ -376,7 +579,7 @@ plot_simulation = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspec
                   hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
                   zero_marker
 
-c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GSasis',('e01','e03')].values,discard_diagonal=True)
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GS',('e01','e03')].values,discard_diagonal=True)
 theoretical_slope= (echo_times_dict['e01']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
 df = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE1,TE3)']).T
 empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)

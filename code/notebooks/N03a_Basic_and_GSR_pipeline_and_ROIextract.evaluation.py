@@ -107,7 +107,7 @@ print(log_path)
 
 with open(script_path, 'w') as the_file:
     the_file.write('# Script Creation Date: %s\n' % str(datetime.date.today()))
-    the_file.write(f'# swarm -f {script_path} -g 16 -t 8 -b 2 --time 00:20:00 --logdir {log_path} --partition quick,norm --module afni\n')
+    the_file.write(f'# swarm -f {script_path} -g 16 -t 8 -b 2 --time 02:00:00 --logdir {log_path} --partition quick,norm --module afni\n')
     the_file.write('\n')
     for sbj,ses in list(dataset_info_df.index):
         atlas_path  = f'{ATLASES_DIR}/{ATLAS_NAME}/{ATLAS_NAME}.nii.gz'
@@ -119,7 +119,7 @@ script_path
 
 # ```bash
 # # cd /data/SFIMJGC_HCP7T/BCBL2024/swarm.javiergc
-# swarm -f /data/SFIMJGC_HCP7T/BCBL2024/swarm.javiergc/N03a_Basic_and_GSR_pipeline_and_ROIextract.Power264-evaluation.SWARM.sh -g 16 -t 8 -b 10 --time 00:20:00 --logdir /data/SFIMJGC_HCP7T/BCBL2024/logs.javiergc/N03a_Basic_and_GSR_pipeline_and_ROIextract.Power264-evaluation.log --partition quick,norm --module afni
+# swarm -f /data/SFIMJGC_HCP7T/BCBL2024/swarm.javiergc/N03a_Basic_and_GSR_pipeline_and_ROIextract.Power264-evaluation.SWARM.sh -g 16 -t 8 -b 10 --time 02:00:00 --logdir /data/SFIMJGC_HCP7T/BCBL2024/logs.javiergc/N03a_Basic_and_GSR_pipeline_and_ROIextract.Power264-evaluation.log --partition quick,norm --module afni
 
 # # 3. Check all expected datasets were processed
 

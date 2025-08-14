@@ -12,7 +12,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from itertools import combinations
 
-from .basics import TES_MSEC, SESSIONS, echo_pairs_tuples, echo_pairs, pairs_of_echo_pairs
+from .basics import TES_MSEC, SESSIONS, echo_pairs
 
 
 
@@ -326,88 +326,6 @@ def get_barplot_evaluation_dataset(qa,fc_metric,qc_metric,x='Pre-processing',hue
     plt.tight_layout()
     plt.close()
     return fig
-    
-# def get_barplot(qa,nordic,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True):
-#     """
-#     Create Static Bar Graph for a given quality metric
-#     """
-#     if isinstance(qa, xr.DataArray):
-#         df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
-#         df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
-#         df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
-    
-#     num_hues   = len(list(df[hue].unique()))
-#     df_swarm = df.copy()
-#     if remove_outliers_from_swarm:
-#         quantile_value = df[qc_metric].quantile(.97)
-#         df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
-#     if (x=='Pre-processing') and (hue=='NORDIC'):
-#         pairs  = [((p,'On'),(p,'Off')) for p in df[x].unique()]
-#         colors = sns.color_palette("rocket",num_hues)
-#     if (x=='NORDIC') and (hue=='Pre-processing'):
-#         pairs      = [(('On',c[0]),('On',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
-#         pairs      = pairs + [(('Off',c[0]),('Off',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
-#         colors = sns.color_palette("Set2",num_hues)
-
-#     sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
-#     fig, axs = plt.subplots(1,1,figsize=(6,6));
-#     sns.despine(top=True, right=True)
-#     sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
-#     sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=.5, dodge=True, legend=False, palette=colors);
-    
-#     if show_stats:
-#         annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
-#         annotation.configure(test=stat_test, text_format=stat_annot_type, loc='inside', verbose=0);
-#         annotation.apply_test(alternative='two-sided');
-#         annotation.annotate();
-#     sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=4, title=None, frameon=False,)
-#     plt.tight_layout()
-#     plt.close()
-#     return fig
-
-def get_barplot_discovery_dataset(qa_xr,nordic,fc_metric,qc_metric,x='Pre-processing',hue='Session',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best'):
-    """
-    Create Static Bar Graph for a given quality metric
-    """
-    df         = qa_xr.sel(fc_metric=fc_metric, nordic=nordic, qc_metric=qc_metric).mean(dim='ee_vs_ee').to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric','nordic'],axis=1).reset_index()
-    df.columns = ['Subject','Session','Pre-processing',qc_metric]
-    df         = df.replace({'constant_gated':'Constant TR','cardiac_gated':'Cardiac Gating','ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana-fastica','ALL_Tedana-robustica':'Tedana-robustica', 'NORDIC':'On'})
-    num_hues   = len(list(df[hue].unique()))
-    
-    if (x=='Pre-processing') and (hue=='Session'):
-        pairs  = [((p,'Constant TR'),(p,'Cardiac Gating')) for p in df[x].unique()]
-        colors = sns.color_palette("rocket",num_hues)
-    if (x=='Session') and (hue=='Pre-processing'):
-        pairs      = [(('Constant TR',c[0]),('Constant TR',c[1])) for c in combinations(list(df[hue].unique()),2)]
-        pairs      = pairs + [(('Cardiac Gating',c[0]),('Cardiac Gating',c[1])) for c in combinations(list(df[hue].unique()),2)]
-        colors = sns.color_palette("Set2",num_hues)
-        
-    fig, axs = plt.subplots(1,1,figsize=(6,6));
-    sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
-    sns.swarmplot(data=df,hue=hue, y=qc_metric, x=x, ax =axs, s=.5, dodge=True, legend=False, palette=colors);
-    
-    if show_stats:
-        annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
-        annotation.configure(test=stat_test, text_format=stat_annot_type, loc='inside', verbose=0);
-        annotation.apply_test(alternative='two-sided');
-        annotation.annotate();
-    sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=4, title=None, frameon=False,)
-    plt.close()
-    return fig
-    
-#def get_barplot(qa_xr,nordic, fc_metric,qc_metric):
-#    
-#    df= qa_xr.sel(fc_metric=fc_metric, nordic=nordic, qc_metric=qc_metric).mean(dim='ee_vs_ee').to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric','nordic'],axis=1).reset_index()
-#    df.columns=['Subject','Data Type','Pre-processing',qc_metric]
-#    df = df.replace({'constant_gated':'Constant TR','cardiac_gated':'Cardiac Gating', 'ALL_Basic':'Basic Regressors','ALL_GSasis':'GRS','ALL_Tedana':'Tedana'})
-#
-#    g = sns.catplot(data=df,kind='bar',x='Data Type',hue='Pre-processing',y=qc_metric, errorbar=('ci', 95), alpha=0.5)
-#    sns.swarmplot(data=df, x="Data Type",hue='Pre-processing', y=qc_metric, size=1, dodge=True, legend=False)
-#    g.set_axis_labels("", qc_metric)
-#    g.despine(left=True)
-    
-    return pn.pane.Matplotlib(g.figure, tight=True)
-    
 
 # Dynamic Group Level Report Functions
 # ====================================

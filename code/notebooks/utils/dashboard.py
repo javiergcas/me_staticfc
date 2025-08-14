@@ -12,18 +12,35 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from itertools import combinations
 
-from .basics import TES_MSEC, SESSIONS, echo_pairs
-
-
+from .basics import TES_MSEC, echo_pairs
 
 # Scatter Plot related functions
 # ==============================
 def gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_linear_fit=False, ax_lim=None, hexbin=False):
     """
     Generate scatter plot for two different FC matrices
+
+    Inputs:
+    -------
+    dataset (str): name of the dataset being used (e.g., evaluation, discovery)
+    data_fc (dict): dictionary with FC matrices
+    sbj (str): subject ID
+    ses (str): session ID
+    pp (str): pre-processing pipeline
+    nordic (str): whether Nordic was used or not
+    eep1 (str): first echo pair in the format 'e02|e02'
+    eep2 (str): second echo pair in the format 'e02|e02'
+    fc_metric (str): FC metric to be used ('R' for correlation, 'C' for covariance)
+    show_linear_fit (bool): whether to show linear fit line or not
+    ax_lim (float): axis limits for the scatter plot
+    hexbin (bool): whether to use hexbin plot instead of scatter plot
+
+    Returns:
+    --------
+    hvplot object with the scatter plot and theoretical lines
+
     """
     echo_times_dict = TES_MSEC[dataset]
-    ses_list        = SESSIONS[dataset]
 
     if (sbj,ses,pp,nordic,eep1,fc_metric) not in data_fc:
         return pn.pane.Markdown('#Not Available')
@@ -69,8 +86,29 @@ def gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_line
 
 def fc_across_echoes_scatter_page(dataset,fc_data,qa_data,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=False, ax_lim=None, other_stats=None, hexbin=False):
     """
-    Create Frame with scatter plots for all FC combinations and table with QC metrics
+    Create panel Frame with scatter plots for all FC combinations and table with QC metrics
+
+    Inputs:
+    -------
+    dataset (str): name of the dataset being used (e.g., evaluation, discovery)
+    fc_data (dict): dictionary with FC matrices
+    qa_data (xarray.DataArray): xarray object with quality metrics
+    sbj (str): subject ID
+    ses (str): session ID
+    pp (str): pre-processing pipeline
+    nordic (str): whether Nordic was used or not
+    fc_metric (str): FC metric to be used ('R' for correlation, 'C' for covariance)
+    pairs_of_echo_pairs (list): list of echo pair combinations in the format ['e02|e02_vs_e03|e03', ...]
+    show_line (bool): whether to show linear fit line or not
+    ax_lim (float): axis limits for the scatter plot
+    other_stats (pd.DataFrame or None): additional statistics to be displayed in the table
+    hexbin (bool): whether to use hexbin plot instead of scatter plot
+
+    Returns:
+    --------
+    pn.Row: Panel layout containing the scatter plots and statistics table
     """
+
     # Grid of scatter plots
     scatter_layout = pn.layout.GridBox(ncols=5)
     for i in pairs_of_echo_pairs:
@@ -96,6 +134,24 @@ def fc_across_echoes_scatter_page(dataset,fc_data,qa_data,sbj,ses,pp, nordic,fc_
 def get_fc_matrix(data, qa_xr, sbj, ses, pp, nordic, fc_metric, echo_pair='e02|e02', net_cmap='viridis', ax_lim=None, title=None):
     """
     Get an hvplot-based FC matrix
+
+    Inputs:
+    -------
+    data (dict): dictionary with FC matrices
+    qa_xr (xarray.DataArray): xarray object with quality metrics
+    sbj (str): subject ID
+    ses (str): session ID
+    pp (str): pre-processing pipeline
+    nordic (str): whether Nordic was used or not
+    fc_metric (str): FC metric to be used ('R' for correlation, 'C' for covariance)
+    echo_pair (str): echo pair in the format 'e02|e02'
+    net_cmap (str): colormap for networks
+    ax_lim (float or None): axis limits for the colorbar, if None, default limits are used
+    title (str or None): title for the plot, if None, a default title is generated
+
+    Returns:
+    --------
+    hvplot object with the FC matrix plot
     """
     # Set Title in colorbar
     if fc_metric == 'R':
@@ -128,6 +184,22 @@ def get_fc_matrix(data, qa_xr, sbj, ses, pp, nordic, fc_metric, echo_pair='e02|e
 def get_fc_matrices(data,qa_xr,sbj,ses,nordic, fc_metric, echo_pair='e02|e02', net_cmap='viridis', title=None):
     """
     Create a layout with FC matrices (R and C) for the different pipelines
+    
+    Inputs:
+    -------
+    data (dict): dictionary with FC matrices
+    qa_xr (xarray.DataArray): xarray object with quality metrics
+    sbj (str): subject ID
+    ses (str): session ID
+    nordic (str): whether Nordic was used or not
+    fc_metric (str): FC metric to be used ('R' for correlation, 'C' for covariance)
+    echo_pair (str): echo pair in the format 'e02|e02'
+    net_cmap (str): colormap for networks
+    title (str or None): title for the plot, if None, a default title is generated
+
+    Returns:
+    --------
+    pn.Row: Panel layout containing the FC matrices for different pipelines
     """
     if fc_metric == 'R':
         cbar_title = "Pearson's Correlation:"
@@ -235,6 +307,26 @@ def cov_across_echoes_scatter_page(cov_data,qa_data,sbj,ses,pp, nordic, pairs_of
 def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False,session='all'):
     """
     Create Static Bar Graph for a given quality metric
+
+    Inputs:
+    -------
+    qa (xarray.DataArray or pd.DataFrame): quality assessment data
+    fc_metric (str): functional connectivity metric to be used
+    qc_metric (str): quality control metric to be plotted
+    x (str): column name for the x-axis (default: 'Pre-processing')
+    hue (str): column name for the hue (default: 'NORDIC')
+    show_stats (bool): whether to show statistical annotations or not
+    stat_test (str): statistical test to be used for annotations
+    stat_annot_type (str): type of annotation to be used ('star' or 'text')
+    legend_location (str): location of the legend in the plot
+    remove_outliers_from_swarm (bool): whether to remove outliers from swarm plot
+    palette (str): color palette to be used for the plot
+    show_points (bool): whether to show individual data points in the plot
+    session (str): session filter
+
+    Returns:
+    --------
+    matplotlib figure: bar plot with quality metrics
     """
     if isinstance(qa, xr.DataArray):
         df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
@@ -250,8 +342,8 @@ def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',sho
     # Extract available values for X and HUE
     x_options   = list(df[x].unique())
     hue_options = list(df[hue].unique())
-    num_xs      = len(x_options)
-    num_hues    = len(hue_options)
+    num_x_categories = len(x_options)
+    num_hue_categories = len(hue_options)
     
     df_swarm = df.copy()
     if remove_outliers_from_swarm:
@@ -259,7 +351,7 @@ def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',sho
         df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
         df_swarm.dropna(inplace=True)
     pairs  = [((x,h[1]),(x,h[0])) for x in x_options for h in combinations(hue_options,2)]
-    colors = sns.color_palette(palette,num_hues) 
+    colors = sns.color_palette(palette,num_hue_categories) 
 
     sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
     fig, axs = plt.subplots(1,1,figsize=(6,6));
@@ -278,54 +370,6 @@ def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',sho
     plt.close()
     return fig
     
-
-# Static Group Level Report Functions
-# ====================================
-def get_barplot_evaluation_dataset(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False):
-    """
-    Create Static Bar Graph for a given quality metric
-    """
-    if isinstance(qa, xr.DataArray):
-        df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
-        df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
-        #df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
-        df         = df.replace({'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana-fastica','ALL_Tedana-robustica':'Tedana-robustica', 'NORDIC':'On'})
-    elif isinstance(qa, pd.DataFrame):
-        df = qa.copy()
-    else:
-        print("++ ERROR [get_barplot]: Expected a xarray or pandas dataframe but got something else. Function exiting")
-        return None
-    
-    # Extract available values for X and HUE
-    x_options   = list(df[x].unique())
-    hue_options = list(df[hue].unique())
-    num_xs      = len(x_options)
-    num_hues    = len(hue_options)
-    
-    df_swarm = df.copy()
-    if remove_outliers_from_swarm:
-        quantile_value = df[qc_metric].quantile(.97)
-        df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
-        df_swarm.dropna(inplace=True)
-    pairs  = [((x,h[1]),(x,h[0])) for x in x_options for h in combinations(hue_options,2)]
-    colors = sns.color_palette(palette,num_hues) 
-
-    sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
-    fig, axs = plt.subplots(1,1,figsize=(6,6));
-    sns.despine(top=True, right=True)
-    sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
-    if show_points:
-        sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=1, dodge=True, legend=False, palette=colors);
-    
-    if show_stats:
-        annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
-        annotation.configure(test=stat_test, text_format=stat_annot_type, loc='inside', verbose=0);
-        annotation.apply_test(alternative='two-sided');
-        annotation.annotate();
-    sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=4, title=None, frameon=False,)
-    plt.tight_layout()
-    plt.close()
-    return fig
 
 # Dynamic Group Level Report Functions
 # ====================================

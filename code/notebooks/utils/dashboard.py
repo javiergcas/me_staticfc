@@ -7,22 +7,24 @@ import panel as pn
 import pandas as pd
 import numpy as np
 import xarray as xr
-from nilearn.connectome import sym_matrix_to_vec, vec_to_sym_matrix
+from nilearn.connectome import sym_matrix_to_vec
 import seaborn as sns
 import matplotlib.pyplot as plt
 from itertools import combinations
 
 from .basics import TES_MSEC, SESSIONS, echo_pairs_tuples, echo_pairs, pairs_of_echo_pairs
-echo_times_dict = TES_MSEC['Spreng_Scanner1']
-ses_list        = SESSIONS['Spreng_Scanner1']
+
 
 
 # Scatter Plot related functions
 # ==============================
-def gen_scatter(data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_linear_fit=False, ax_lim=None, hexbin=False):
+def gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_linear_fit=False, ax_lim=None, hexbin=False):
     """
     Generate scatter plot for two different FC matrices
     """
+    echo_times_dict = TES_MSEC[dataset]
+    ses_list        = SESSIONS[dataset]
+
     if (sbj,ses,pp,nordic,eep1,fc_metric) not in data_fc:
         return pn.pane.Markdown('#Not Available')
     data_df = pd.DataFrame(columns=[eep1,eep2, fc_metric])
@@ -65,7 +67,7 @@ def gen_scatter(data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_linear_fit=F
      
     return plot
 
-def fc_across_echoes_scatter_page(fc_data,qa_data,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=False, ax_lim=None, other_stats=None, hexbin=False):
+def fc_across_echoes_scatter_page(dataset,fc_data,qa_data,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=False, ax_lim=None, other_stats=None, hexbin=False):
     """
     Create Frame with scatter plots for all FC combinations and table with QC metrics
     """
@@ -73,7 +75,7 @@ def fc_across_echoes_scatter_page(fc_data,qa_data,sbj,ses,pp, nordic,fc_metric, 
     scatter_layout = pn.layout.GridBox(ncols=5)
     for i in pairs_of_echo_pairs:
         eep1,eep2=i.split('_vs_')
-        plot = gen_scatter(fc_data,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_line, ax_lim, hexbin=hexbin)
+        plot = gen_scatter(dataset,fc_data,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_line, ax_lim, hexbin=hexbin)
         scatter_layout.append(plot)
 
     # Statistics Table 
@@ -82,7 +84,7 @@ def fc_across_echoes_scatter_page(fc_data,qa_data,sbj,ses,pp, nordic,fc_metric, 
     if other_stats is None:
         tables = pn.Column(pn.pane.DataFrame(stats_df.round(2)), pn.layout.Divider(), pn.pane.DataFrame(stats_mean_df.round(2))   )
     else:
-        tables = pn.Column(pn.pane.DataFrame(stats_df.round(2)), pn.layout.Divider(), pn.pane.DataFrame(stats_mean_df.round(2)), pn.layout.Divider(),  pn.pane.DataFrame(other_stats.loc[(sbj,ses)]) )
+        tables = pn.Column(pn.pane.DataFrame(stats_df.round(2)), pn.layout.Divider(), pn.pane.DataFrame(stats_mean_df.round(2)), pn.layout.Divider(),  pn.pane.DataFrame(other_stats))
 
     # Create Page
     frame = pn.Row(scatter_layout, tables)
@@ -134,7 +136,8 @@ def get_fc_matrices(data,qa_xr,sbj,ses,nordic, fc_metric, echo_pair='e02|e02', n
         cbar_title = "Covariance:"
         clim = (-.5,.5)
     layout = pn.Row()
-    for pp, pp_label in zip(['ALL_Basic','ALL_GSasis','ALL_Tedana'],['Basic Regression','Global Signal Regression','Tedana Denoising']):
+    for pp, pp_label in zip(['ALL_Basic','ALL_GS','ALL_Tedana-fastica','ALL_Tedana-robustica'],
+                            ['Basic Regression','Global Signal Regression','Tedana Denoising (fastica)','Tedana Denoising (robustica)']):
         if (sbj,ses,pp,nordic,echo_pair,fc_metric) not in data:
             layout.append(pn.pane.Markdown('#Not Available'))
             continue
@@ -229,14 +232,64 @@ def cov_across_echoes_scatter_page(cov_data,qa_data,sbj,ses,pp, nordic, pairs_of
     
 # Static Group Level Report Functions
 # ====================================
-def get_barplot(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2'):
+def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False,session='all'):
     """
     Create Static Bar Graph for a given quality metric
     """
     if isinstance(qa, xr.DataArray):
         df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
         df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
-        df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
+        df         = df.replace({'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana-fastica','ALL_Tedana-robustica':'Tedana-robustica', 'NORDIC':'On'})
+    elif isinstance(qa, pd.DataFrame):
+        df = qa.copy()
+    else:
+        print("++ ERROR [get_barplot]: Expected a xarray or pandas dataframe but got something else. Function exiting")
+        return None
+    if session !='all':
+        df = df[df['Session']==session]
+    # Extract available values for X and HUE
+    x_options   = list(df[x].unique())
+    hue_options = list(df[hue].unique())
+    num_xs      = len(x_options)
+    num_hues    = len(hue_options)
+    
+    df_swarm = df.copy()
+    if remove_outliers_from_swarm:
+        quantile_value = df[qc_metric].quantile(.97)
+        df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
+        df_swarm.dropna(inplace=True)
+    pairs  = [((x,h[1]),(x,h[0])) for x in x_options for h in combinations(hue_options,2)]
+    colors = sns.color_palette(palette,num_hues) 
+
+    sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
+    fig, axs = plt.subplots(1,1,figsize=(6,6));
+    sns.despine(top=True, right=True)
+    sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
+    if show_points:
+        sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=1, dodge=True, legend=False, palette=colors);
+    
+    if show_stats:
+        annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
+        annotation.configure(test=stat_test, text_format=stat_annot_type, loc='inside', verbose=0);
+        annotation.apply_test(alternative='two-sided');
+        annotation.annotate();
+    sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=4, title=None, frameon=False,)
+    plt.tight_layout()
+    plt.close()
+    return fig
+    
+
+# Static Group Level Report Functions
+# ====================================
+def get_barplot_evaluation_dataset(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False):
+    """
+    Create Static Bar Graph for a given quality metric
+    """
+    if isinstance(qa, xr.DataArray):
+        df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+        df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
+        #df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
+        df         = df.replace({'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana-fastica','ALL_Tedana-robustica':'Tedana-robustica', 'NORDIC':'On'})
     elif isinstance(qa, pd.DataFrame):
         df = qa.copy()
     else:
@@ -261,7 +314,8 @@ def get_barplot(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stat
     fig, axs = plt.subplots(1,1,figsize=(6,6));
     sns.despine(top=True, right=True)
     sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
-    sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=1, dodge=True, legend=False, palette=colors);
+    if show_points:
+        sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=1, dodge=True, legend=False, palette=colors);
     
     if show_stats:
         annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
@@ -317,7 +371,7 @@ def get_barplot_discovery_dataset(qa_xr,nordic,fc_metric,qc_metric,x='Pre-proces
     """
     df         = qa_xr.sel(fc_metric=fc_metric, nordic=nordic, qc_metric=qc_metric).mean(dim='ee_vs_ee').to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric','nordic'],axis=1).reset_index()
     df.columns = ['Subject','Session','Pre-processing',qc_metric]
-    df         = df.replace({'constant_gated':'Constant TR','cardiac_gated':'Cardiac Gating','ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
+    df         = df.replace({'constant_gated':'Constant TR','cardiac_gated':'Cardiac Gating','ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana-fastica','ALL_Tedana-robustica':'Tedana-robustica', 'NORDIC':'On'})
     num_hues   = len(list(df[hue].unique()))
     
     if (x=='Pre-processing') and (hue=='Session'):

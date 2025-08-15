@@ -51,7 +51,7 @@ tedana -d pb03.${SBJ}.r01.e01.volreg+tlrc.HEAD \
         --convention orig                      \
         --ica-method robustica                 \
         --seed 42                              \
-        --n-robust-runs 50
+        --n-robust-runs 30
 
 
 # Scale each echo separately

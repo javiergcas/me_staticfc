@@ -53,9 +53,10 @@ do
     ECHOTIMES="13.9 31.7 49.5"
     echo "${SBJ} --> Echoes=${ECHOTIMES}"
     
+    #            -blocks despike tshift align tlrc volreg mask combine scale regress                          \
     afni_proc.py                                                                                             \
                 -subj_id ${SBJ}                                                                              \
-                -blocks despike tshift align tlrc volreg mask combine scale regress                          \
+                -blocks despike tshift align tlrc volreg mask combine regress                          \
                 -radial_correlate_blocks tcat volreg                                                         \
                 -copy_anat ${ANAT_PROC_DIR}/anatSS.${SBJ}.nii.gz                                             \
                 -anat_has_skull no                                                                           \

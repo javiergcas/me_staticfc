@@ -54,9 +54,10 @@ do
     if [[ "${SITE}" == "1" ]]; then ECHOTIMES="13.7 30 47"; else ECHOTIMES="14 29.96 45.92"; fi
     echo "${SBJ} Site=${SITE} --> Echoes=${ECHOTIMES}"
     
+    #            -blocks despike tshift align tlrc volreg mask combine scale regress                          \
     afni_proc.py                                                                                             \
                 -subj_id ${SBJ}                                                                              \
-                -blocks despike tshift align tlrc volreg mask combine scale regress                          \
+                -blocks despike tshift align tlrc volreg mask combine regress                          \
                 -radial_correlate_blocks tcat volreg                                                         \
                 -copy_anat ${ANAT_PROC_DIR}/anatSS.${SBJ}.nii.gz                                             \
                 -anat_has_skull no                                                                           \

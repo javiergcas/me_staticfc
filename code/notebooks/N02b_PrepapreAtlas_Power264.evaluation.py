@@ -234,3 +234,5 @@ for n in nw_list:
 c = np.array(c)
 
 np.savetxt('../../../resources/BrainNetViewer/BrainNetViewer_Nodes_colors.txt',c, fmt='%0.4f', delimiter=',')
+
+

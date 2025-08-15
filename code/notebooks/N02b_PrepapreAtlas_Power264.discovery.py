@@ -184,12 +184,16 @@ roi_info_df.reset_index(drop=True)
 
 # # 9. We create a new NIFTI file where those ROIs have been removed.
 
-bad_rois_minus = '-'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
-bad_rois_plus  = '+'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
-print(bad_rois_minus)
-print(bad_rois_plus)
+if len(bad_roi_list) > 0:
+    bad_rois_minus = '-'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
+    bad_rois_plus  = '+'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
+    print(bad_rois_minus)
+    print(bad_rois_plus)
+else:
+    print('No ROI needs to be removed')
 
-command=f"""module load afni; \
+if len(bad_roi_list) > 0:
+    command=f"""module load afni; \
            cd {ATLAS_DIR}; \
            3dcalc -overwrite \
                   -a {ATLAS_NAME}.nii.gz \
@@ -200,14 +204,15 @@ command=f"""module load afni; \
                   -expr 'a-{bad_rois_minus}' \
                   -prefix rm.{ATLAS_NAME}.fov_restricted.nii.gz; \
                   """
-output  = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
-print(output.strip().decode())
+    output  = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+    print(output.strip().decode())
 
 from nilearn.plotting import plot_roi
 
-plot_roi(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.RemovedROIs.nii.gz'),title='ROIs that will be removed from the ATLAS')
-
 plot_roi(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.nii.gz'),title='Original ATLAS')
+
+if len(bad_roi_list) > 0:
+    plot_roi(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.RemovedROIs.nii.gz'),title='ROIs that will be removed from the ATLAS')
 
 plot_roi(osp.join(ATLAS_DIR,f'rm.{ATLAS_NAME}.fov_restricted.nii.gz'),title='FOV-Restricted ATLAS')
 
@@ -242,5 +247,9 @@ for n in nw_list:
 c = np.array(c)
 
 np.savetxt(f'../../../resources/BrainNetViewer/{ATLAS_NAME}.BrainNetViewer_Nodes_colors.txt',c, fmt='%0.4f', delimiter=',')
+
+
+
+
 
 

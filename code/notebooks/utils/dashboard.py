@@ -304,7 +304,7 @@ def cov_across_echoes_scatter_page(cov_data,qa_data,sbj,ses,pp, nordic, pairs_of
     
 # Static Group Level Report Functions
 # ====================================
-def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False,session='all'):
+def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False,session='all', label_font_size=12):
     """
     Create Static Bar Graph for a given quality metric
 
@@ -353,7 +353,7 @@ def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',sho
     pairs  = [((x,h[1]),(x,h[0])) for x in x_options for h in combinations(hue_options,2)]
     colors = sns.color_palette(palette,num_hue_categories) 
 
-    sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
+    sns.set_context("paper", rc={"xtick.labelsize": label_font_size, "ytick.labelsize": label_font_size, "axes.labelsize": label_font_size, 'legend.fontsize':label_font_size})
     fig, axs = plt.subplots(1,1,figsize=(6,6));
     sns.despine(top=True, right=True)
     sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
@@ -365,7 +365,11 @@ def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',sho
         annotation.configure(test=stat_test, text_format=stat_annot_type, loc='inside', verbose=0);
         annotation.apply_test(alternative='two-sided');
         annotation.annotate();
-    sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=4, title=None, frameon=False,)
+    if num_hue_categories > 3:
+        ncol = 2
+    else:
+        ncol = num_hue_categories
+    sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=ncol, title=None, frameon=False)
     plt.tight_layout()
     plt.close()
     return fig

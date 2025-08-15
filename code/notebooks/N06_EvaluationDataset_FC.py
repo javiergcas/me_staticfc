@@ -26,6 +26,7 @@ import os
 port_tunnel = int(os.environ['PORT2'])
 print('++ INFO: Second Port available: %d' % port_tunnel)
 
+# +
 from utils.basics import TES_MSEC, SESSIONS
 from utils.basics import ATLASES_DIR, PRCS_DATA_DIR, PRJ_DIR
 import os.path as osp
@@ -36,9 +37,13 @@ from tqdm import tqdm
 import panel as pn
 from nilearn.connectome import sym_matrix_to_vec, vec_to_sym_matrix
 from utils.basics import compute_residuals, softmax, echo_pairs, echo_pairs_tuples, pairs_of_echo_pairs
-from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_barplot, get_fc_matrix,dynamic_summary_plot_gated, get_barplot
+from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_barplot_evaluation_dataset, get_fc_matrix,dynamic_summary_plot_gated
 import pickle
 
+from utils.basics import weighted_line_preference, em_angle_mixture
+
+
+# -
 
 def reject_outliers(data, m = 2.):
     d = np.abs(data - np.median(data))
@@ -49,10 +54,13 @@ def reject_outliers(data, m = 2.):
 
 # ***
 
-echo_times_dict = TES_MSEC['Spreng_Scanner1']
-ses_list        = SESSIONS['Spreng_Scanner1']
+DATASET = 'evaluation'
+echo_times_dict = TES_MSEC[DATASET]
+ses_list        = SESSIONS[DATASET]
 
-ATLAS_NAME = 'Power264'
+print(echo_times_dict)
+
+ATLAS_NAME = f'Power264-{DATASET}'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
 dataset_info_df = pd.read_csv(osp.join(PRJ_DIR,'resources','good_scans.txt'))
@@ -64,8 +72,6 @@ print('++ Number of scans: %s scans' % dataset_info_df.shape[0])
 
 print('Echo Pairs[n=%d] = %s' %(len(echo_pairs),str(echo_pairs)))
 print('Pairs of Echo Pairs[n=%d] = %s' %(len(pairs_of_echo_pairs),str(pairs_of_echo_pairs)))
-
-echo_times_dict
 
 # ***
 # # 2. Load Atlas Information
@@ -93,16 +99,17 @@ power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0]
 
 # +
 pp_opts = {'No Censoring | Basic':'ALL_Basic',
-           'No Censoring | GSR':'ALL_GSasis',
-           'No Censoring | Tedana':'ALL_Tedana', 
-           'No Censoring | Tedana (Nc=88)':'ALL_Tedana-NORDIC_FixNComps'}
-nordic_opts = {'Do not use':'Off', 'Active':'On'}
+           'No Censoring | GSR':'ALL_GS',
+           'No Censoring | Tedana (fastica)':'ALL_Tedana-fastica'} #, 
+#           'No Censoring | Tedana (robustica)':'ALL_Tedana-robustica'}
+nordic_opts = {'Do not use':'off', 'Active':'on'}
 
 data_fc = {}
 # -
 
 # %%time
-filename = './cache/spreng_fc.pkl'
+filename = './cache/evaluation_fc.pkl'
+i=0
 if osp.exists(filename):
     print("++ WARNING: Loading pre-existing data from cache folder.")
     with open(filename, 'rb') as f:
@@ -112,18 +119,17 @@ else:
         for nordic in nordic_opts.values():
             for pp in pp_opts.values():
                 for (e_x,e_y) in echo_pairs_tuples:
-                    # Compose Dfolder name
-                    if (nordic == 'Off') and ('NORDIC_FixNComps' not in pp):
-                        d_folder = f'D02_Preproc_fMRI_{ses}'
-                    elif (nordic == 'On')  and ('NORDIC_FixNComps' not in pp):
-                        d_folder = f'D04_Preproc_fMRI_{ses}_NORDIC'
-                    elif ('NORDIC_FixNComps' in pp):
-                        d_folder = f'D05_Preproc_fMRI_{ses}_NORDIC_FixNComps'
-                    pp_suffix = pp.replace('-NORDIC_FixNComps','') # Will need to be removed once I re-organize files <=========================================
+                    d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
                     # Compose path to input TS
-                    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{pp_suffix}.{ATLAS_NAME}_000.netts')
-                    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{pp_suffix}.{ATLAS_NAME}_000.netts')
+                    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_x}.volreg.spc.tproject_{pp}.{ATLAS_NAME}_000.netts')
+                    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_y}.volreg.spc.tproject_{pp}.{ATLAS_NAME}_000.netts')
                     # Load TS into memory
+                    if (not osp.exists(roi_ts_path_x)) or (not osp.exists(roi_ts_path_y)):
+                        print(f'++ WARNING: Missing input files for {sbj},{ses},{e_x},{e_y},{nordic},{pp}')
+                        print(f'            {roi_ts_path_x}')
+                        print(f'            {roi_ts_path_y}')
+                        i+=1
+                        continue
                     roi_ts_x      = np.loadtxt(roi_ts_path_x)
                     roi_ts_y      = np.loadtxt(roi_ts_path_y)
                     aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
@@ -135,6 +141,7 @@ else:
                     data_fc[sbj, ses, pp,nordic,'|'.join((e_x,e_y)),'C']  = pd.DataFrame(aux_c,index=roi_idxs,columns=roi_idxs)
     with open(filename, 'wb') as f:
         pickle.dump(data_fc, f)
+print(i)
 
 # ***
 #
@@ -143,11 +150,12 @@ else:
 sbj_list  = sorted(list((set(dataset_info_df.index.get_level_values(level='Subject')))))
 
 # %%time
-filename = './cache/spreng_fc_qc.nc'
+filename = './cache/evaluation_fc_qc.nc'
 if osp.exists(filename):
     print("++ WARNING: Loading pre-existing data from cache folder.")
     qa_xr = xr.open_dataarray(filename)
 else:
+    print('hello')
     qa_xr = xr.DataArray(dims=['sbj','ses','pp','nordic','fc_metric','ee_vs_ee','qc_metric',],
                          coords={'sbj':sbj_list,
                                  'ses':['ses-1','ses-2'],
@@ -155,7 +163,7 @@ else:
                                  'nordic':list(nordic_opts.values()),
                                  'fc_metric':['R','C'],
                                  'ee_vs_ee':pairs_of_echo_pairs,
-                                 'qc_metric':['dBOLD','dSo','pBOLD','pSo','TSNR (Full Brain)','TSNR (Visual Cortex)']})
+                                 'qc_metric':['dBOLD','dSo','pBOLD','pSo','TSNR (Full Brain)','TSNR (Visual Cortex)','dBOLD_ang','dSo_ang','pBOLD_ang','pSo_ang','pBOLD_em','pSo_em']})
     for sbj in tqdm(sbj_list):
         for ses in  ['ses-1','ses-2']:
             partial_key = (sbj, ses)
@@ -163,7 +171,7 @@ else:
             if not sbj_ses_in_fc:
                 print('++ WARNING: This combination of sbj,ses [%s,%s] is not available. XR will contain np.nan.' % (sbj,ses))
                 continue
-            for fc_metric in ['R','C']:
+            for fc_metric in ['C','R']:
                 for pp in pp_opts.values():
                     for nordic in nordic_opts.values():
                         for eep in pairs_of_echo_pairs:
@@ -183,63 +191,68 @@ else:
                                 e1_Y,e2_Y     = eep2.split('|')
                                 BOLD_line_sl  = (echo_times_dict[e1_Y]*echo_times_dict[e2_Y])/(echo_times_dict[e1_X]*echo_times_dict[e2_X])
                             # Compute dBOLD and dSo metrics
-                            qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dBOLD'] = np.sqrt((compute_residuals(data_df[eep1].values,data_df[eep2].values,BOLD_line_sl,BOLD_line_int)**2).sum())
-                            qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dSo']   = np.sqrt((compute_residuals(data_df[eep1].values,data_df[eep2].values,So_line_sl,  So_line_int)**2).sum())
+                            #qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dBOLD'] = np.sqrt((compute_residuals(data_df[eep1].values,data_df[eep2].values,BOLD_line_sl,BOLD_line_int)**2).sum())
+                            #qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dSo']   = np.sqrt((compute_residuals(data_df[eep1].values,data_df[eep2].values,So_line_sl,  So_line_int)**2).sum())
                             # REMOVE OUTLIERS: qa_xr.loc[sbj,ses,pp,nordic,'C',eep,'dBOLD'] = np.sqrt((reject_outliers(compute_residuals(data_df[eep1].values,data_df[eep2].values,BOLD_line_sl,BOLD_line_int),3)**2).sum())
                             # REMOVE OUTLIERS: qa_xr.loc[sbj,ses,pp,nordic,'C',eep,'dSo']   = np.sqrt((reject_outliers(compute_residuals(data_df[eep1].values,data_df[eep2].values,So_line_sl,  So_line_int),3)**2).sum())
                             # Compute probabilities
-                            qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD'], qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo'] = 1 - softmax(qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,['dBOLD','dSo']].values)
+                            #qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD'], qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo'] = 1 - softmax(qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,['dBOLD','dSo']].values)
 
-                            #TSNR 
-                            if nordic == 'Off' :
-                                d_folder = f'D02_Preproc_fMRI_{ses}'
-                            elif (nordic == 'On') & (pp=='ALL_Tedana-NORDIC_FixNComps'):
-                                d_folder = f'D05_Preproc_fMRI_{ses}_NORDIC_FixNComps'
-                            else:
-                                d_folder = f'D04_Preproc_fMRI_{ses}_NORDIC'
+                            # QC based on angular approach
+                            # ============================
+                            out                                                    = weighted_line_preference(np.abs(data_df.values), So_line_sl, BOLD_line_sl, weight_fn=lambda r: np.power(r,.5))
+                            qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dSo_ang']   = (out['d1'] * out['per_point_weights']).sum()
+                            qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dBOLD_ang'] = (out['d2'] * out['per_point_weights']).sum()
+                            qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD_ang'], qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo_ang'] = 1 - softmax(qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,['dBOLD_ang','dSo_ang']].values,substract_max=True)
 
-                            pp_suffix = pp.replace('-NORDIC_FixNComps','')
-                            aux_rois_path = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_ROIs_e02_{pp_suffix}.txt')
-                            aux_fb_path   = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_FB_e02_{pp_suffix}.txt')
-                            if osp.exists(aux_rois_path) and osp.exists(aux_fb_path):
-                                aux_rois = pd.read_csv(aux_rois_path,skiprows=3, sep='\s+').drop(0).set_index('ROI_name')
-                                aux_fb   = pd.read_csv(aux_fb_path,skiprows=3, sep='\s+').drop(0).set_index('ROI_name')
-                                qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'TSNR (Visual Cortex)'] = float(aux_rois.loc['GHCP-R_Primary_Visual_Cortex','Tmed'])
-                                qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'TSNR (Full Brain)']    = float(aux_rois.loc['GHCP-R_Primary_Visual_Cortex','Tmed'])
-                            else:
-                                print('++ WARNING: TSNR info missing for [%s,%s,%s]' % (sbj,ses,aux_rois_path))
+                            # QC based on EM approach
+                            #out = em_angle_mixture(data_df.values, BOLD_line_sl,So_line_sl)
+                            #qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD_em'], qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo_em'] = out['pi'],1-out['pi']
+                            # TSNR
+                            # ====
+                            #d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
+                            #aux_rois_path = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_ROIs_e02_{pp}.txt')
+                            #aux_fb_path   = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_FB_e02_{pp}.txt')
+                            #if osp.exists(aux_rois_path) and osp.exists(aux_fb_path):
+                            #    aux_rois = pd.read_csv(aux_rois_path,skiprows=3, sep='\s+').drop(0).set_index('ROI_name')
+                            #    aux_fb   = pd.read_csv(aux_fb_path,skiprows=3, sep='\s+').drop(0).set_index('ROI_name')
+                            #    qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'TSNR (Visual Cortex)'] = float(aux_rois.loc['GHCP-R_Primary_Visual_Cortex','Tmed'])
+                            #    qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'TSNR (Full Brain)']    = float(aux_rois.loc['GHCP-R_Primary_Visual_Cortex','Tmed'])
+                            #else:
+                            #    print('++ WARNING: TSNR info missing for [%s,%s,%s]' % (sbj,ses,aux_rois_path))                            
     qa_xr.to_netcdf(filename)
+
+# + active=""
+# print(qa_xr.shape)
+# qa_xr = qa_xr.sel(ee_vs_ee=['e01|e01_vs_e02|e03','e01|e01_vs_e02|e02','e01|e01_vs_e03|e03', 'e01|e02_vs_e03|e03'])
+# print(qa_xr.shape)
+# -
 
 # ***
 # # Tedana derived metrics
 
-# +
-other_stats = {'Off': pd.DataFrame(columns=['Likely BOLD | Var','Unlikely BOLD | Var', 'Likely BOLD | #ICs','Unlikely BOLD | #ICs'], index=dataset_info_df.index),
-               'On': pd.DataFrame(columns=['Likely BOLD | Var','Unlikely BOLD | Var', 'Likely BOLD | #ICs','Unlikely BOLD | #ICs'], index=dataset_info_df.index)}
-# Results when NORDIC is Off
-for sbj in sbj_list:
+# %%time
+other_stats = pd.DataFrame(columns=['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic','Value'])
+other_stats = other_stats.set_index(['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic'])
+for sbj in tqdm(sbj_list, desc='Subjects'):
     for ses in ses_list:
+        partial_key = (sbj, ses)
+        sbj_ses_in_fc = any(key[:len(partial_key)] == partial_key for key in data_fc)
+        if not sbj_ses_in_fc:
+            print('++ WARNING: This combination of sbj,ses [%s,%s] is not available. XR will contain np.nan.' % (sbj,ses))
+            continue
         for nordic in nordic_opts.values():
-            # Compose path to input TS < ==== This part will need to change once I get the tedana options in the correct place
-            if nordic == 'Off':
-                d_folder = f'D02_Preproc_fMRI_{ses}'
-            if nordic == 'On':
-                d_folder = f'D04_Preproc_fMRI_{ses}_NORDIC'
-            ica_metrics_path         = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tedana_r01','ica_metrics.tsv')
-            if not osp.exists(ica_metrics_path):
-                print("++ WARNING: Missing data [%s,%s]" % (sbj,ses))
-                continue
-            ica_metrics              = pd.read_csv(ica_metrics_path, sep='\t').set_index('Component')
-            likely_bold_components   = list(ica_metrics[ica_metrics['classification_tags']=='Likely BOLD'].index)
-            unlikely_bold_components = list(ica_metrics[ica_metrics['classification_tags']=='Unlikely BOLD'].index)
-            other_stats[nordic].loc[(sbj,ses),'Likely BOLD | Var']    = ica_metrics.loc[likely_bold_components,'variance explained'].sum().round(2)
-            other_stats[nordic].loc[(sbj,ses),'Unlikely BOLD | Var']  = ica_metrics.loc[unlikely_bold_components,'variance explained'].sum().round(2)
-            other_stats[nordic].loc[(sbj,ses),'Likely BOLD | #ICs']   = len(likely_bold_components)
-            other_stats[nordic].loc[(sbj,ses),'Unlikely BOLD | #ICs'] = len(unlikely_bold_components)
+            d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
+            for tedana_type in ['fastica']:#,'robustica']:
+                ica_metrics_path         = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'tedana_{tedana_type}','ica_metrics.tsv')
+                ica_metrics              = pd.read_csv(ica_metrics_path, sep='\t').set_index('Component')
+                likely_bold_components   = list(ica_metrics[ica_metrics['classification_tags']=='Likely BOLD'].index)
+                unlikely_bold_components = list(ica_metrics[ica_metrics['classification_tags']=='Unlikely BOLD'].index)
 
-other_stats['Off'] = other_stats['Off'].infer_objects()
-other_stats['On']  = other_stats['On'].infer_objects()
-# -
+                other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','Summed Variance']   = ica_metrics.loc[likely_bold_components,'variance explained'].sum().round(2)
+                other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','Summed Variance'] = ica_metrics.loc[unlikely_bold_components,'variance explained'].sum().round(2)
+                other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','#ICs']              = len(likely_bold_components)
+                other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','#ICs']            = len(unlikely_bold_components)
 
 # ***
 #
@@ -258,13 +271,16 @@ plot_select   = pn.widgets.Select(name='Plot type',      options={'Scatter Plot'
 scat_lim_input                          = pn.widgets.FloatInput(name='Scatter Limit Value', value=1., step=0.1, start=0., end=50., width=200)
 show_line_fit_checkbox                  = pn.widgets.Toggle(name='Show Linear Fit', button_type='primary')
 scatter_extra_confs_card                = pn.Card(scat_lim_input,show_line_fit_checkbox, title='Scatter Plot & FCs | Configuration')
+
+qc_metric_select                        = pn.widgets.Select(name='QC Metric to show', options=list(qa_xr['qc_metric'].values), value='TSNR (Full Brain)', width=200)
 pps_to_include_in_group_results         = pn.widgets.MultiSelect(name='Pipelines to include in Group Results', options=pp_opts, value=list(pp_opts.values())[0:3], width=200)
 remove_outliers_from_swarm_plots_toggle = pn.widgets.Toggle(name='Remove Outliers from BarPlot', button_type='primary')
-
-show_stats_toggle = pn.widgets.Toggle(name='Show Statistical Annotations', button_type='primary')
+show_stats_toggle  = pn.widgets.Toggle(name='Show Statistical Annotations', button_type='primary')
+show_points_toggle = pn.widgets.Toggle(name='Show Individual Points', button_type='primary')
 stat_test_select  = pn.widgets.Select(name='Statistical Test', options={'Paired T-test':'t-test_paired','Independent T-test':'t-test_ind','Mann Whitney (Ind,non-param)':'Mann-Whitney'})
 annot_type_select = pn.widgets.Select(name='Annotation Type', options={'Stars':'star','Simple Annotation':'simple','Full Annotation':'full'})
-barplot_extra_confs_card = pn.Card(show_stats_toggle,stat_test_select,annot_type_select,pps_to_include_in_group_results,remove_outliers_from_swarm_plots_toggle, title='Group Results (Static) | Configuration')
+barplot_extra_confs_card = pn.Card(qc_metric_select, show_points_toggle, show_stats_toggle,stat_test_select,annot_type_select,pps_to_include_in_group_results,remove_outliers_from_swarm_plots_toggle, title='Group Results (Static) | Configuration')
+
 sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Divider(),
            plot_select,pn.layout.Divider(),
            scatter_extra_confs_card,pn.layout.Divider(),
@@ -274,13 +290,14 @@ sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Di
 
 # -
 
-@pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select,pps_to_include_in_group_results,remove_outliers_from_swarm_plots_toggle)
-def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim,show_stats,stat_test,annot_type,pps_to_include_in_barplot,remove_outliers_from_swarm_plots):
+@pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select,pps_to_include_in_group_results,remove_outliers_from_swarm_plots_toggle, qc_metric_select,show_points_toggle)
+def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim,show_stats,stat_test,annot_type,pps_to_include_in_barplot,remove_outliers_from_swarm_plots, qc_metric,show_points):
     if plot_type == 'hexbin':
-        frame = fc_across_echoes_scatter_page(data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats[nordic], hexbin=True)
+        frame = fc_across_echoes_scatter_page(DATASET,data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=True)
         return frame
     if plot_type == 'scatter':
-        frame = fc_across_echoes_scatter_page(data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats[nordic], hexbin=False)
+        frame = fc_across_echoes_scatter_page(DATASET,data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=False)
+        #frame = fc_across_echoes_scatter_page(data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats[nordic], hexbin=False)
         return frame
     if plot_type == 'FCmats':
         fcR = get_fc_matrices(data_fc,qa_xr,sbj,ses, nordic, 'R', net_cmap=power264_nw_cmap)
@@ -293,15 +310,19 @@ def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_
             layout.append(fcR)
         return layout
     if plot_type == 'group_res_static':
-        a = pn.Card(get_barplot(qa_xr.sel(pp=pps_to_include_in_barplot),nordic,fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',
-                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='pBOLD for Speng Sample (1)')
-        b = pn.Card(get_barplot(qa_xr.sel(pp=pps_to_include_in_barplot),nordic,fc_metric,'pBOLD',  x='Pre-processing',hue='NORDIC',
-                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='pBOLD for Speng Sample (2)')
-        c = pn.Card(get_barplot(qa_xr.sel(pp=pps_to_include_in_barplot),nordic,fc_metric,'TSNR (Full Brain)',  hue='Pre-processing',x='NORDIC',
-                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='TSNR for Speng Sample (1)')
-        d = pn.Card(get_barplot(qa_xr.sel(pp=pps_to_include_in_barplot),nordic,fc_metric,'TSNR (Full Brain)',  x='Pre-processing',hue='NORDIC',
-                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='TSNR for Speng Sample (2)')
-        return pn.GridBox(*[a,b,c,d],ncols=2)
+        #a = pn.Card(get_barplot_evaluation_dataset(qa_xr.sel(pp=pps_to_include_in_barplot),fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',
+        #                        stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='pBOLD for Speng Sample (1)')
+        #b = pn.Card(get_barplot_evaluation_dataset(qa_xr.sel(pp=pps_to_include_in_barplot),fc_metric,'pBOLD',  x='Pre-processing',hue='NORDIC',
+        #                        stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='pBOLD for Speng Sample (2)')
+        aa = pn.Card(get_barplot_evaluation_dataset(qa_xr.sel(pp=pps_to_include_in_barplot),fc_metric,qc_metric,  hue='Pre-processing',x='NORDIC',
+                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left',show_points=show_points),title='pBOLD_ang for Speng Sample (1)')
+        bb = pn.Card(get_barplot_evaluation_dataset(qa_xr.sel(pp=pps_to_include_in_barplot),fc_metric,qc_metric,  x='Pre-processing',hue='NORDIC',
+                                stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left', show_points=show_points),title='pBOLD_ang for Speng Sample (2)')
+        #c = pn.Card(get_barplot_evaluation_dataset(qa_xr.sel(pp=pps_to_include_in_barplot),fc_metric,'TSNR (Full Brain)',  hue='Pre-processing',x='NORDIC',
+        #                        stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='TSNR for Speng Sample (1)')
+        #d = pn.Card(get_barplot_evaluation_dataset(qa_xr.sel(pp=pps_to_include_in_barplot),fc_metric,'TSNR (Full Brain)',  x='Pre-processing',hue='NORDIC',
+        #                        stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left'),title='TSNR for Speng Sample (2)')
+        return pn.GridBox(*[aa,bb],ncols=2)
         #return pn.Row(get_barplot(qa_xr,nordic,fc_metric,'pBOLD',  hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type),
         #              get_barplot(qa_xr,nordic,fc_metric, 'dBOLD', hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type),
         #              get_barplot(qa_xr,nordic,fc_metric, 'dSo',   hue='Pre-processing',x='NORDIC',stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type))
@@ -397,6 +418,6 @@ df['TSNR (Full Brain)'].replace() df['TSNR (Full Brain)'].quantile(.97)
 
 quantile_value = df['TSNR (Full Brain)'].quantile(.97)
 df['TSNR (Full Brain)'] = df['TSNR (Full Brain)'].where(df['TSNR (Full Brain)'] <= quantile_value, quantile_value)
-    
+
 
 

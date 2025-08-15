@@ -100,8 +100,8 @@ for sbj,ses in tqdm(list(dataset_info_df.index)):
                 d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
                 for (e_x,e_y) in echo_pairs_tuples:
                     # Compose path to input TS
-                    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{pp}.{ATLAS_NAME}_000.netts')
-                    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{pp}.{ATLAS_NAME}_000.netts')
+                    roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_x}.volreg.spc.tproject_{pp}.{ATLAS_NAME}_000.netts')
+                    roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'errts.{sbj}.r01.{e_y}.volreg.spc.tproject_{pp}.{ATLAS_NAME}_000.netts')
                     # Load TS into memory
                     roi_ts_x      = np.loadtxt(roi_ts_path_x)
                     roi_ts_y      = np.loadtxt(roi_ts_path_y)
@@ -169,6 +169,7 @@ for sbj in tqdm(sbj_list, desc='Subjects'):
                         qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'dSo']   = np.sqrt((compute_residuals(data_df[eep1].values,data_df[eep2].values,So_line_sl,  So_line_int)**2).sum())
         
                         # Compute probabilities
+                        #print(sbj, ses, pp, nordic, qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,['dBOLD','dSo']].values)
                         qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD'], qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo'] = 1 - softmax(qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,['dBOLD','dSo']].values)
 
 # ***
@@ -180,7 +181,7 @@ for sbj in tqdm(sbj_list, desc='Subjects'):
     for ses in ses_list:
         for nordic in nordic_opts.values():
             d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
-            for tedana_type in ['fastica','robustica']:
+            for tedana_type in ['fastica']:#,'robustica']:
                 ica_metrics_path         = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'tedana_{tedana_type}','ica_metrics.tsv')
                 ica_metrics              = pd.read_csv(ica_metrics_path, sep='\t').set_index('Component')
                 likely_bold_components   = list(ica_metrics[ica_metrics['classification_tags']=='Likely BOLD'].index)
@@ -190,6 +191,92 @@ for sbj in tqdm(sbj_list, desc='Subjects'):
                 other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','Summed Variance'] = ica_metrics.loc[unlikely_bold_components,'variance explained'].sum().round(2)
                 other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','#ICs']              = len(likely_bold_components)
                 other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','#ICs']            = len(unlikely_bold_components)
+
+
+
+
+
+
+
+
+
+
+
+from sklearn.decomposition import PCA
+pca = PCA(n_components=2)
+a = sym_matrix_to_vec(data_fc['MGSBJ06','constant_gated','ALL_Basic','off','e01|e01','C'].values, discard_diagonal=True)
+b = sym_matrix_to_vec(data_fc['MGSBJ06','constant_gated','ALL_Basic','off','e03|e03','C'].values, discard_diagonal=True)
+df=pd.DataFrame([a,b]).T
+df.shape
+
+# +
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+import holoviews as hv
+import hvplot.pandas
+
+hv.extension('bokeh')
+
+# Assume df has shape (Nsam, 2)
+assert df.shape[1] == 2, "DataFrame must have exactly 2 columns for 2D plotting"
+
+# Run PCA
+pca = PCA(n_components=2)
+pca.fit(df)
+
+# +
+# Center of the data
+center = df.mean().values
+
+# Directions scaled for plotting
+directions = pca.components_ * np.sqrt(pca.explained_variance_)[:, np.newaxis] * 2  # Scale for visibility
+
+# +
+# Create segments for the two principal directions
+segments_data = []
+for vec in directions:
+    start = center - vec
+    end   = center + vec
+    segments_data.append((*start, *end))
+
+segments_df = pd.DataFrame(segments_data, columns=['x0', 'y0', 'x1', 'y1'])
+segments = hv.Segments(segments_df).opts(color='red', line_width=2)
+# -
+
+df
+
+# Plot original data
+scatter = df.hvplot.scatter(x='0', y='1', alpha=0.5, datashade=True)
+
+# Combine and show
+(scatter * segments).opts(title="Data with First Two Principal Directions")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ***
 #

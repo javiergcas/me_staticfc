@@ -304,7 +304,7 @@ def cov_across_echoes_scatter_page(cov_data,qa_data,sbj,ses,pp, nordic, pairs_of
     
 # Static Group Level Report Functions
 # ====================================
-def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False,session='all', label_font_size=12):
+def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False,session='all', label_font_size=12, pair_weights=None):
     """
     Create Static Bar Graph for a given quality metric
 
@@ -329,7 +329,10 @@ def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',sho
     matplotlib figure: bar plot with quality metrics
     """
     if isinstance(qa, xr.DataArray):
-        df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+        if pair_weights is None:
+            df         = qa.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+        else:
+            df         = qa.weighted(pair_weights).mean(dim='ee_vs_ee').sel(fc_metric='C', qc_metric='pBOLD').to_dataframe(name='C').drop(['fc_metric','qc_metric'],axis=1).reset_index()
         df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
         df         = df.replace({'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana-fastica','ALL_Tedana-robustica':'Tedana-robustica', 'NORDIC':'On'})
     elif isinstance(qa, pd.DataFrame):

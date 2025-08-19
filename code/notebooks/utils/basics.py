@@ -49,7 +49,22 @@ def get_dataset_index(dataset, verbose=True):
         print('++ Number of scans    = %d' % out.shape[0])
         print('++ Number of subjects = %d' % out.get_level_values('Subject').get_level_values('Subject').unique().shape[0])
     return out
-        
+
+# pBOLD-related functions
+# ========================
+def compute_residuals(x, y, m, b):
+    """Compute residuals after projection onto the line y = mx + b."""
+    x_p, y_p = project_points(x, y, m, b)
+    residuals = np.sqrt((x - x_p)**2 + (y - y_p)**2)
+    return residuals
+
+def project_points(x, y, m, b):
+    """Project points (x, y) onto the line y = mx + b."""
+    denom = 1 + m**2
+    x_p = (x + m * (y - b)) / denom
+    y_p = m * x_p + b
+    return x_p, y_p
+
 def mse_dist(points,m1,m2,weight_fn=None, max_weight_fn=lambda r: np.minimum(r,np.quantile(r,.99)),tol = 1e-12, verbose_return=False):
     x  = points[:,0]; y = points[:,1]
     pd1 = compute_residuals(x,y,m1,0.0)
@@ -85,6 +100,30 @@ def mse_dist(points,m1,m2,weight_fn=None, max_weight_fn=lambda r: np.minimum(r,n
     else:
         return frac_line1,frac_line2
 
+def chord_distance_between_intersecting_lines(m1, m2, r=1.0):
+    """
+    Compute the chord distance between two lines intersecting at the origin,
+    based on points at distance r from the origin along each line.
+
+    Inputs:
+    m1: slope of the first line
+    m2: slope of the second line
+    r: radious at which to compute the distance [default = 1.0]
+
+    Returns:
+    distance: chord distance between both lines.
+    """
+    # points on line 1
+    x1 = r / np.sqrt(1 + m1**2)
+    y1 = m1 * x1
+
+    # points on line 2
+    x2 = r / np.sqrt(1 + m2**2)
+    y2 = m2 * x2
+
+    # Euclidean distance between the points
+    distance = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+    return distance
 # def mse_dist(points,m1,m2,weight_fn=None, max_weight=None,tol = 1e-12):
 #     x  = points[:,0]; y = points[:,1]
 #     pd1 = compute_residuals(x,y,m1,0.0)
@@ -344,18 +383,7 @@ def read_gen_ss_review_table(file_path):
 
 # QA-related functions
 
-def project_points(x, y, m, b):
-    """Project points (x, y) onto the line y = mx + b."""
-    denom = 1 + m**2
-    x_p = (x + m * (y - b)) / denom
-    y_p = m * x_p + b
-    return x_p, y_p
 
-def compute_residuals(x, y, m, b):
-    """Compute residuals after projection onto the line y = mx + b."""
-    x_p, y_p = project_points(x, y, m, b)
-    residuals = np.sqrt((x - x_p)**2 + (y - y_p)**2)
-    return residuals
 
 def softmax(x, substract_max=False):
   """

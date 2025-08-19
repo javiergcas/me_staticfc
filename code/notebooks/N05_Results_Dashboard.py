@@ -41,7 +41,7 @@ from nilearn.connectome import sym_matrix_to_vec
 from utils.basics import compute_residuals, echo_pairs, pairs_of_echo_pairs, echo_pairs_tuples, get_dataset_index
 from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_static_report, get_fc_matrix,dynamic_summary_plot_gated
 
-from utils.basics import mse_dist
+from utils.basics import mse_dist, chord_distance_between_intersecting_lines
 
 
 # -
@@ -148,24 +148,24 @@ print(i)
 
 # ***
 #
-# # 4. Compute QA-metrics
+# # 4. Compute pBOLD
 #
 # ## 4.1. First compute pBOLD on each separate scatter plot
 
 # %%time
-filename = f'./cache/{DATASET}_fc_qc.nc'
+filename = f'./cache/{DATASET}_pBOLD_all_scatters.nc'
 if osp.exists(filename):
     print("++ WARNING: Loading pre-existing data from cache folder.")
-    qa_xr = xr.open_dataarray(filename)
+    pBOLD_xr = xr.open_dataarray(filename)
 else:
-    qa_xr = xr.DataArray(dims=['sbj','ses','pp','nordic','fc_metric','ee_vs_ee','qc_metric',],
+    pBOLD_xr = xr.DataArray(dims=['sbj','ses','pp','nordic','fc_metric','ee_vs_ee','qc_metric',],
                          coords={'sbj':       sbj_list,
                                  'ses':       ses_list,
                                  'pp':        list(pp_opts.values()),
                                  'nordic':    list(nordic_opts.values()),
                                  'fc_metric': ['R','C'],
                                  'ee_vs_ee':  pairs_of_echo_pairs,
-                                 'qc_metric': ['pBOLD','pSo','TSNR (Full Brain)','TSNR (Visual Cortex)']})
+                                 'qc_metric': ['pBOLD','pSo']})
     for sbj in tqdm(sbj_list):
         for ses in ses_list:
             partial_key = (sbj, ses)
@@ -196,30 +196,13 @@ else:
                                 BOLD_line_sl  = (echo_times_dict[e1_Y]*echo_times_dict[e2_Y])/(echo_times_dict[e1_X]*echo_times_dict[e2_X])
                             # QC1. Compute dBOLD and dSo metrics
                             # ==================================
-                            qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD'],qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo'] = mse_dist(data_df.values,
+                            pBOLD_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pBOLD'],pBOLD_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'pSo'] = mse_dist(data_df.values,
                                                                                                                                            BOLD_line_sl,
                                                                                                                                            So_line_sl, 
-                                                                                                                                           weight_fn=lambda r: np.power(r,0.5), 
+                                                                                                                                           weight_fn=lambda r: np.power(r,1.0), 
                                                                                                                                            max_weight_fn=lambda r: np.minimum(r,np.quantile(r,.95)),
                                                                                                                                            tol=1e-3)
-                            # TSNR
-                            # ====
-                            d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
-                            aux_rois_path = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_ROIs_e02_{pp}.txt')
-                            aux_fb_path   = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_FB_e02_{pp}.txt')
-                            if osp.exists(aux_rois_path) and osp.exists(aux_fb_path):
-                                aux_rois = pd.read_csv(aux_rois_path,skiprows=3, sep=r'\s+').drop(0).set_index('ROI_name')
-                                aux_fb   = pd.read_csv(aux_fb_path,skiprows=3, sep=r'\s+').drop(0).set_index('ROI_name')
-                                qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'TSNR (Visual Cortex)'] = float(aux_rois.loc['GHCP-R_Primary_Visual_Cortex','Tmed'])
-                                qa_xr.loc[sbj,ses,pp,nordic,fc_metric,eep,'TSNR (Full Brain)']    = float(aux_fb.loc['NONE','Tmed'])
-                            else:
-                                if not osp.exists(aux_rois_path):
-                                    print('++ WARNING: TSNR info missing for [%s,%s,%s]' % (sbj,ses,aux_rois_path))   
-                                else:
-                                    print('++ WARNING: TSNR info missing for [%s,%s,%s]' % (sbj,ses,aux_fb_path)) 
-    qa_xr.to_netcdf(filename)
-
-qa_xr.sel(sbj='sub-01',ses='ses-1',pp='ALL_Basic', nordic='on',fc_metric='R', qc_metric='TSNR (Full Brain)')
+    pBOLD_xr.to_netcdf(filename)
 
 # ## 4.2. Weigthed average across scatter plots
 #
@@ -233,21 +216,51 @@ for ppe in pairs_of_echo_pairs:
     ex1,ex2 = ep1.split('|')
     ey1,ey2 = ep2.split('|')
     this_case_BOLD_slope = (echo_times_dict[ey1] * echo_times_dict[ey2]) / (echo_times_dict[ex1] * echo_times_dict[ex2])
-    scat_plot_weights[ppe] = chord_distance_between_intersecting_lines(1.0, this_case_BOLD_slope, r=1.0)
+    scat_plot_weights.loc[ppe] = chord_distance_between_intersecting_lines(1.0, this_case_BOLD_slope, r=1.0)
+
+scat_plot_weights
 
 # Here, we know calculate the final metrics per dataset. Only pBOLD will use the weights during the average. TSNR will be simply averaged.
 
 QC_metrics = {}
 for fc_metric in ['R','C']:
-    QC_metrics[(fc_metric,'pBOLD')] = \
-        qa_xr.weighted(scat_plot_weights).mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric='pBOLD').to_dataframe(name='pBOLD').drop(['fc_metric','qc_metric'],axis=1).reset_index()
-    QC_metrics[(fc_metric,'TSNR (Full Brain)')] = \
-        qa_xr.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric='TSNR (Full Brain)').to_dataframe(name='TSNR (Full Brain)').drop(['fc_metric','qc_metric'],axis=1).reset_index()
-    QC_metrics[(fc_metric,'TSNR (Visual Cortex)')] = \
-        qa_xr.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric='TSNR (Visual Cortex)').to_dataframe(name='TSNR (Full Brain)').drop(['fc_metric','qc_metric'],axis=1).reset_index()
+    for qc_metric in ['pBOLD','pSo']:
+        aux_df = pBOLD_xr.weighted(scat_plot_weights).mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
+        aux_df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
+        QC_metrics[(fc_metric,qc_metric)] = aux_df
+QC_metrics['C','pBOLD'].head(5)
+
+# # 5. Gather TSNR information
+
+# %%time
+for TSNR_metric in ['TSNR (Full Brain)','TSNR (Visual Cortex)']:
+    aux_df = pd.DataFrame(columns=['Subject','Session','Pre-processing','NORDIC',TSNR_metric])
+    aux_df.set_index(['Subject','Session','Pre-processing','NORDIC'], inplace=True)
+    for sbj in tqdm(sbj_list, desc=TSNR_metric):
+        for ses in ses_list:
+            partial_key = (sbj, ses)
+            sbj_ses_in_fc = any(key[:len(partial_key)] == partial_key for key in data_fc)
+            if not sbj_ses_in_fc:
+                print('++ WARNING: This combination of sbj,ses [%s,%s] is not available. XR will contain np.nan.' % (sbj,ses))
+                continue
+            for pp in pp_opts.values():
+                for nordic in nordic_opts.values():            
+                    d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
+                    if TSNR_metric == 'TSNR (Visual Cortex)':
+                        aux_rois_path = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_ROIs_e02_{pp}.txt')
+                        aux_rois      = pd.read_csv(aux_rois_path,skiprows=3, sep=r'\s+').drop(0).set_index('ROI_name')
+                        aux_df.loc[sbj,ses,pp,nordic] = float(aux_rois.loc['GHCP-R_Primary_Visual_Cortex','Tmed'])
+                    if TSNR_metric == 'TSNR (Full Brain)':
+                        aux_fb_path   = osp.join(PRCS_DATA_DIR,sbj,d_folder,'tsnr_stats_regress',f'TSNR_FB_e02_{pp}.txt')
+                        aux_fb        = pd.read_csv(aux_fb_path,skiprows=3, sep=r'\s+').drop(0).set_index('ROI_name')
+                        aux_df.loc[sbj,ses,pp,nordic] = float(aux_fb.loc['NONE','Tmed'])
+    QC_metrics['C',TSNR_metric] = aux_df.reset_index()
+    QC_metrics['R',TSNR_metric] = aux_df.reset_index()
+
+QC_metrics['C',qc_metric].head(5)
 
 # ***
-# # Tedana derived metrics
+# # 6. Tedana derived metrics
 
 # %%time
 other_stats = pd.DataFrame(columns=['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic','Value'])
@@ -273,12 +286,12 @@ for sbj in tqdm(sbj_list, desc='Subjects'):
                 other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','#ICs']            = len(unlikely_bold_components)
 
 # ***
-
-# ***
 #
 # # Create Dashboard
 
 # +
+avial_qc_metrics = list(set([key[1] for key in QC_metrics.keys()]))
+
 sbj_select                              = pn.widgets.Select(name='Subject',        options=sbj_list, width=200)
 ses_select                              = pn.widgets.Select(name='Data Type',      options=ses_list+['all'], width=200)
 pp_select                               = pn.widgets.Select(name='Pre-processing', options=pp_opts, width=200)
@@ -292,7 +305,7 @@ scat_lim_input                          = pn.widgets.FloatInput(name='Scatter Li
 show_line_fit_checkbox                  = pn.widgets.Toggle(name='Show Linear Fit', button_type='primary')
 scatter_extra_confs_card                = pn.Card(scat_lim_input,show_line_fit_checkbox, title='Scatter Plot & FCs | Configuration')
 
-qc_metric_select                        = pn.widgets.Select(name='QC Metric to show', options=list(qa_xr['qc_metric'].values), value='pBOLD', width=200)
+qc_metric_select                        = pn.widgets.Select(name='QC Metric to show', options=avial_qc_metrics, value='pBOLD', width=200)
 pps_to_include_in_group_results         = pn.widgets.MultiSelect(name='Pipelines to include in Group Results', options=pp_opts, value=list(pp_opts.values())[0:3], width=200)
 remove_outliers_from_swarm_plots_toggle = pn.widgets.Toggle(name='Remove Outliers from BarPlot', button_type='primary')
 show_stats_toggle                       = pn.widgets.Toggle(name='Show Statistical Annotations', button_type='primary')
@@ -315,36 +328,34 @@ sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Di
 @pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select,pps_to_include_in_group_results,remove_outliers_from_swarm_plots_toggle, qc_metric_select,show_points_toggle)
 def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim,show_stats,stat_test,annot_type,pps_to_include_in_barplot,remove_outliers_from_swarm_plots, qc_metric,show_points):
     if plot_type == 'hexbin':
-        frame = fc_across_echoes_scatter_page(DATASET,data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=True)
+        frame = fc_across_echoes_scatter_page(DATASET,data_fc,pBOLD_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=True)
         return frame
     if plot_type == 'scatter':
-        frame = fc_across_echoes_scatter_page(DATASET,data_fc,qa_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=False)
+        frame = fc_across_echoes_scatter_page(DATASET,data_fc,pBOLD_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=False)
         return frame
     if plot_type == 'FCmats':
-        fcR = get_fc_matrices(data_fc,qa_xr,sbj,ses, nordic, 'R', net_cmap=power264_nw_cmap)
-        fcC = get_fc_matrices(data_fc,qa_xr,sbj,ses, nordic, 'C', net_cmap=power264_nw_cmap)
+        fcR = get_fc_matrices(data_fc,pBOLD_xr,sbj,ses, nordic, 'R', net_cmap=power264_nw_cmap)
+        fcC = get_fc_matrices(data_fc,pBOLD_xr,sbj,ses, nordic, 'C', net_cmap=power264_nw_cmap)
         return pn.Column(fcR,fcC)
     if plot_type == 'FCmats_echoes':
         layout = pn.GridBox(ncols=3)
         for ep in echo_pairs:
-            fcR = get_fc_matrix(data_fc,qa_xr,sbj,ses,pp,nordic,fc_metric,echo_pair=ep, net_cmap=power264_nw_cmap, ax_lim=ax_lim, title='%s | %s' % (fc_metric,ep))
+            fcR = get_fc_matrix(data_fc,pBOLD_xr,sbj,ses,pp,nordic,fc_metric,echo_pair=ep, net_cmap=power264_nw_cmap, ax_lim=ax_lim, title='%s | %s' % (fc_metric,ep))
             layout.append(fcR)
         return layout
     if plot_type == 'group_res_static':
-        aa = pn.Card(get_static_report(qa_xr.sel(pp=pps_to_include_in_barplot),fc_metric,qc_metric,  hue='Pre-processing',x='NORDIC',
+        data_to_show = QC_metrics[fc_metric,qc_metric].set_index('Pre-processing').loc[pps_to_include_in_barplot].reset_index()
+        aa = pn.Card(get_static_report(data_to_show,fc_metric,qc_metric,  hue='Pre-processing',x='NORDIC',
                                 stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, 
-                                 remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left',show_points=show_points, session=ses, pair_weights=w),    title=f'{qc_metric} grouped by NORDIC')
-        bb = pn.Card(get_static_report(qa_xr.sel(pp=pps_to_include_in_barplot),fc_metric,qc_metric,  x='Pre-processing',hue='NORDIC',
+                                 remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left',show_points=show_points, session=ses),    title=f'{qc_metric} grouped by NORDIC')
+        bb = pn.Card(get_static_report(data_to_show,fc_metric,qc_metric,  x='Pre-processing',hue='NORDIC',
                                 stat_test=stat_test, show_stats=show_stats, stat_annot_type=annot_type, 
-                                 remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left', show_points=show_points, session=ses, pair_weights=w),   title=f'{qc_metric} grouped by Pre-processing')
+                                 remove_outliers_from_swarm=remove_outliers_from_swarm_plots, legend_location='lower left', show_points=show_points, session=ses),   title=f'{qc_metric} grouped by Pre-processing')
         return pn.GridBox(*[aa,bb],ncols=2)
     if plot_type == 'group_res_dynamic':
         if fc_metric == 'C':
             pBOLD_card = pn.Card(dynamic_summary_plot_gated(qa_xr, fc_metric, 'pBOLD', nordic),title='pBOLD')
-            #dBOLD_card = pn.Card(dynamic_summary_plot_gated(qa_xr, fc_metric, 'dBOLD', nordic),title='dBOLD')
-            #dS0_card   = pn.Card(dynamic_summary_plot_gated(qa_xr, fc_metric, 'dSo', nordic),title='dSo')
             return pn.Row(pBOLD_card,None,None)
-            #return pn.Row(pBOLD_card,dBOLD_card,dS0_card)
         else:
             return pn.pane.Markdown('# This is not available for R-based FC')
 

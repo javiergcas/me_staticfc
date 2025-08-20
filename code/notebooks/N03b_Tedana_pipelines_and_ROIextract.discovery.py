@@ -41,7 +41,7 @@ import os
 port_tunnel = int(os.environ['PORT2'])
 print('++ INFO: Second Port available: %d' % port_tunnel)
 
-ATLAS_NAME = 'Power264-discovery'
+ATLAS_NAME = f'Power264-{DATASET}'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
 # # 1. Load Dataset Information
@@ -67,7 +67,7 @@ with open(script_path, 'w') as the_file:
     the_file.write('\n')
     for sbj,ses in list(dataset_info_df.index):
         for NORDIC in ['off','on']:
-            for TEDANA_TYPE in ['fastica','robustica']:
+            for TEDANA_TYPE in ['fastica']:
                 the_file.write(f'export SBJ={sbj} SES={ses} NORDIC={NORDIC} TEDANA_TYPE={TEDANA_TYPE} ATLAS_NAME={ATLAS_NAME} ATLAS_PATH={atlas_path} ATLASES_DIR={ATLASES_DIR}; sh  {CODE_DIR}/bash/S10_Tedana_pipelines_and_ROIextract.sh \n')
 the_file.close()     
 

@@ -344,11 +344,9 @@ p05_val = df_null.quantile(0.95).values[0]
 
 df_null.hvplot.kde(label='Null Distribution') * df_real.hvplot.kde(label='Real Data') * hv.VLine(p05_val).opts(line_color='k',line_width=0.5,line_dash='dashed')
 
-Scans for which physio regressors explain a significant amount of variance from the global signal
+# Scans for which physio regressors explain a significant amount of variance from the global signal
 
 df_real[df_real['Var. Exp. by Physio Regressors']> p05_val]
-
-df_null.quantile(0.95)
 
 # ***
 #

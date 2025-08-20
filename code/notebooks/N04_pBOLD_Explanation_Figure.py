@@ -88,19 +88,18 @@ power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0]
 #
 # This cell will load ROI Timeseries, compute R and C, and place these into a dictionary of datafrmes. It will do this for the Basic denoising pipeline (Basic) and no censoring (ALL).
 
-scenarios             = ['ALL_Basic','ALL_GS','ALL_Tedana-fastica','ALL_Tedana-robustica']
+scenarios             = ['ALL_Basic','ALL_GS','ALL_Tedana-fastica']
 scenarios_select_dict = {'No Censoring | Basic':'ALL_Basic',
                          'No Censoring | GSR':'ALL_GS',
-                         'No Censoring | tedana (fastica)':'ALL_Tedana-fastica',
-                         'No Censoring | tedana (robustica)':'ALL_Tedana-robustica'}
+                         'No Censoring | tedana (fastica)':'ALL_Tedana-fastica'}
 fc = {}
 
-for (sbj,ses) in sample_scans:
+for (sbj,ses) in tqdm(sample_scans):
     for scenario in scenarios:
-        for (e_x,e_y) in tqdm(echo_pairs_tuples, desc=scenario):
-            roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'errts.{sbj}.r01.{e_x}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
+        for (e_x,e_y) in echo_pairs_tuples:
+            roi_ts_path_x = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'errts.{sbj}.r01.{e_x}.volreg.spc.tproject_{scenario}.{ATLAS_NAME}_000.netts')
             roi_ts_x      = np.loadtxt(roi_ts_path_x)
-            roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'errts.{sbj}.r01.{e_y}.volreg.scale.tproject_{scenario}.{ATLAS_NAME}_000.netts')
+            roi_ts_path_y = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'errts.{sbj}.r01.{e_y}.volreg.spc.tproject_{scenario}.{ATLAS_NAME}_000.netts')
             roi_ts_y      = np.loadtxt(roi_ts_path_y)
             aux_ts_x = pd.DataFrame(roi_ts_x, columns=roi_info_df['ROI_Name'].values)
             aux_ts_y = pd.DataFrame(roi_ts_y, columns=roi_info_df['ROI_Name'].values)
@@ -110,47 +109,15 @@ for (sbj,ses) in sample_scans:
             fc['R',sbj, ses, scenario,(e_x,e_y)]  = pd.DataFrame(aux_r,index=roi_idxs,columns=roi_idxs)
             fc['C',sbj, ses, scenario,(e_x,e_y)]  = pd.DataFrame(aux_c,index=roi_idxs,columns=roi_idxs)
 
-# # 3. Draw an example of FC following two different denosing methods and the difficulty with deciding which one is best
 #
-# Below we show the full brain R-FC matrices of a single scan for the basic (left) and tedana (right) pipelines. Just by looking at then, it not easy to discern which of these two matrices is a more truthful representation of neurally-driven connectivity.
 
-scan_select      = pn.widgets.Select(name='Sample scan', options=sample_scans_select, width=200)
-scenarioA_select = pn.widgets.Select(name='Left Configuration', options=scenarios_select_dict, width=200)
-scenarioB_select = pn.widgets.Select(name='Right Configuration', options=scenarios_select_dict, width=200)
-conf_card        = pn.Card(scan_select,scenarioA_select,scenarioB_select, title='Configuration')
-
-
-def plot_matrix(scan,scenario,fc_metric='C',echo_pair=('e01','e02'), title=''):
-    sbj_id = scan[0]
-    run_id = scan[1]
-    data   = fc[fc_metric,sbj_id,run_id,scenario,echo_pair]
-    plot   = hvplot_fc(data,major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
-                       cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left', 
-                       cbar_title=f"FC-{fc_metric}", cbar_title_fontsize=14, ticks_font_size=14).opts(tools=[],title=title)
-    return plot
-@pn.depends(scan_select,scenarioA_select)
-def plot_left_matrix(scan,scenario):
-    return plot_matrix(scan,scenario, title='Scenario B: '+ scenario)
-@pn.depends(scan_select,scenarioB_select)
-def plot_right_matrix(scan,scenario):
-    return plot_matrix(scan,scenario, title='Scenario A:' + scenario)   
-
-
-dashboard = pn.Row(conf_card,plot_left_matrix, plot_right_matrix)
-
-dashboard_server = dashboard.show(port=port_tunnel)
-
-dashboard_server.stop()
-
-sbj_id = 'MGSBJ05'
-run_id = 'constant_gated'
-data   = fc['C',sbj_id,run_id,'ALL_Basic',('e01','e02')]
-plot   = hvplot_fc(data,major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
-         cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left',clim=(-.3,.3),
-         cbar_title=f"FC: Covariance", cbar_title_fontsize=14, ticks_font_size=14).opts(tools=[])
-plot
-
-# # Figure 1 - Non-BOLD Data demonstration
+# ***
+#
+# # 3. Create Figure 1
+#
+# ## 3.1. Figure 1.a| Non-BOLD Data demonstration
+#
+# The cell below generates Figure 1.a where we show both a simulation and real case of how data that is non-BOLD dominated behaves.
 
 # +
 sbj='MGSBJ03'
@@ -159,17 +126,20 @@ zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='g
 
 a  = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e01','e02')].values,discard_diagonal=True)
 b  = a + 0.1 * (np.random.normal(0,.25,25425))
+
 df = pd.DataFrame([a,b], index=['C(TE1,TE2)','C(TE1,TE3)']).T
-plot_simulation = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TEi,TEj)', ylabel='C(TEk,TEl)', xlim=(-.1,1.5), ylim=(-.1,1.5)).opts(fontscale=1.2, title='(a) Simulation') * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * zero_marker
+plot_simulation = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TEi,TEj)', ylabel='C(TEk,TEl)', xlim=(-.1,1.5), ylim=(-.1,1.5)).opts(fontscale=1.2, title='(a) Simulation', active_tools=['reset']) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * zero_marker
 
 c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Basic',('e01','e03')].values,discard_diagonal=True)
 df = pd.DataFrame([a,c], index=['C(TE1,TE2)','C(TE1,TE3)']).T
-plot_real_data = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TE1,TE2)', ylabel='C(TE1,TE3)', xlim=(-.1,1.5), ylim=(-.1,1.5)).opts(fontscale=1.2, title='(b) Real Data') * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * zero_marker
+plot_real_data = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TE1,TE2)', ylabel='C(TE1,TE3)', xlim=(-.1,1.5), ylim=(-.1,1.5)).opts(fontscale=1.2, title='(b) Real Data', active_tools=['reset']) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * zero_marker
 output = pn.Column(plot_simulation + plot_real_data)
 output
 # -
 
-# # Figure 1 - BOLD Data demonstration
+# ## 3.2. Figure 1.b| BOLD Data demonstration
+#
+# The cell below generates Figure 1.b where we show both a simulation and real case of how data that is BOLD-dominated behaves.
 
 slope = (echo_times_dict['e02'] * echo_times_dict['e03']) / (echo_times_dict['e01'] * echo_times_dict['e02'])
 slope
@@ -179,30 +149,293 @@ sbj='MGSBJ03'
 ses='constant_gated'
 zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
 
-a  = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-robustica',('e01','e02')].values,discard_diagonal=True)
+a  = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e02')].values,discard_diagonal=True)
 b  = (slope * a) + 0.1 * (np.random.normal(0,.25,25425))
 df = pd.DataFrame([a,b], index=['C(TE1,TE2)','C(TE1,TE3)']).T
-plot_simulation = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TEi,TEj)', ylabel='C(TEk,TEl)', xlim=(-.6,.6), ylim=(-.6,.6)).opts(fontscale=1.2, title='(c) Simulation') * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * hv.Slope(slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * zero_marker
+plot_simulation = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TEi,TEj)', ylabel='C(TEk,TEl)', xlim=(-.6,.6), ylim=(-.6,.6)).opts(fontscale=1.2, title='(c) Simulation', active_tools=['reset']) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * hv.Slope(slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * zero_marker
 
-c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-robustica',('e02','e03')].values,discard_diagonal=True)
+c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e02','e03')].values,discard_diagonal=True)
 df = pd.DataFrame([a,c], index=['C(TE1,TE2)','C(TE2,TE3)']).T
-plot_real_data = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE2,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TE1,TE2)', ylabel='C(TE2,TE3)', xlim=(-.6,.6), ylim=(-.6,.6)).opts(fontscale=1.2, title='(d) Real Data') * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * hv.Slope(slope,0).opts(line_color='g',line_dash='dashed',line_width=2) *zero_marker
+plot_real_data = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE2,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TE1,TE2)', ylabel='C(TE2,TE3)', xlim=(-.6,.6), ylim=(-.6,.6)).opts(fontscale=1.2, title='(d) Real Data', active_tools=['reset']) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * hv.Slope(slope,0).opts(line_color='g',line_dash='dashed',line_width=2) *zero_marker
 output = pn.Column(plot_simulation + plot_real_data)
 output
 # -
 
-# # Figure 2.a - Demonstration of heteroscedasticity
+# # 4. Create Figure 2: How to Compute pBOLD step-by-step
+# ## 4.1. Steps 1 - 3: Compute FCc for two different pairs of echo times and build a scatter plot
+
+# +
+from utils.basics import compute_residuals, project_points
+from bokeh.models import FixedTicker
+
+sbj_fig2       = 'MGSBJ05'
+ses_fig2       = 'constant_gated'
+pp_fig2        = 'ALL_Tedana-fastica'
+fc_metric_fig2 = 'C'
+x_te1,x_te2    = 'e01','e02'
+y_te1,y_te2    = 'e02','e03'
+# -
+
+# Get Connectivity data: top triangle of the FC-C matrix
+a = sym_matrix_to_vec(fc[fc_metric_fig2,sbj_fig2,ses_fig2,pp_fig2,(x_te1,x_te2)].values,discard_diagonal=True)
+b = sym_matrix_to_vec(fc[fc_metric_fig2,sbj_fig2,ses_fig2,pp_fig2,(y_te1,y_te2)].values,discard_diagonal=True)
+df = pd.DataFrame([a,b], index=['C(TEi,TEj)','C(TEk,TEl)']).T
+x = df['C(TEi,TEj)'].values
+y = df['C(TEk,TEl)'].values
+
+# Compute slopes of the two noise regimes of interest
+So_slope   = 1.0
+BOLD_slope = (echo_times_dict[y_te1]*echo_times_dict[y_te2])/(echo_times_dict[x_te1]*echo_times_dict[x_te2])
+
+# +
+# Create basic graphic elements: zero point, BOLD line, non-BOLD line, basic scatter, etc.
+zero_point = hv.HLine(0).opts(line_width=0.5, line_color='k', line_dash='dotted') * hv.VLine(0).opts(line_width=0.5, line_color='k', line_dash='dotted')
+
+#scat_datashaded = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), size=.75).opts(title='')
+scat = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), rasterize=True, cmap='cividis', xlabel=r"$$FC_{C}(TE_{i},TE_{j})$$", ylabel=r"$$FC_{C}(TE_{k},TE_{l})$$",fontsize=14).opts(colorbar_opts={"title": "Num. Overlapping Edges"},toolbar='above', active_tools=['reset'])
+
+nonBOLD_line = hv.Slope(1,0).opts(line_width=3, line_color='r', line_dash='dashed')
+BOLD_line = hv.Slope(BOLD_slope,0).opts(line_width=3, line_color='g', line_dash='dashed') 
+
+data_fit = np.polyfit(a,b,1)
+
+data_line = hv.Slope(data_fit[0],data_fit[1]).opts(line_width=3, line_color='b', line_dash='dashed') 
+print(data_fit)
+# -
+
+data        = fc[fc_metric_fig2 ,sbj_fig2,ses_fig2,pp_fig2,(x_te1,x_te2)]
+plot_fc_x   = hvplot_fc(data,major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
+         cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left',clim=(-.3,.3),
+         cbar_title=r"$$FC_{C}(TE_{i},TE_{j})$$", cbar_title_fontsize=14, ticks_font_size=14).opts(tools=[])
+data        = fc[fc_metric_fig2 ,sbj_fig2,ses_fig2,pp_fig2,(y_te1,y_te2)]
+plot_fc_y   = hvplot_fc(data,major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
+         cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left',clim=(-.3,.3),
+         cbar_title=r"$$FC_{C}(TE_{k},TE_{l})$$", cbar_title_fontsize=14, ticks_font_size=14).opts(tools=[])
+pn.Row(plot_fc_x,plot_fc_y)
+
+(scat * zero_point)
+
+# ## 4.2. Step 4: Estimate distance to line for BOLD dominated regime
+
+# +
+# Let's select a representative connection
+# We pick on around 0.15, 0.25 becuase it is easy to visualize
+
+x_target, y_target = 0.15,0.25
+
+# Compute Euclidean distance
+distances = np.sqrt((df["C(TEi,TEj)"] - x_target)**2 + (df["C(TEk,TEl)"] - y_target)**2)
+
+# Get index of closest row
+closest_idx = distances.idxmin()
+
+# Extract the row
+closest_row = df.loc[closest_idx]
+
+sample_x,sample_y =  closest_row.values
+sample_point = hv.Points((sample_x,sample_y)).opts(size=10,color='k', marker='x')
+print(closest_row, sample_x, sample_y)
+# -
+
+proj_on_BOLD_line             = project_points(sample_x,sample_y,BOLD_slope,0.0)
+proj_on_BOLD_line_point       = hv.Points(proj_on_BOLD_line).opts(size=10,color='g', marker='s')
+proj_on_BOLD_residual_segment = hv.Path([[(sample_x,sample_y), proj_on_BOLD_line]]).opts(color="green", line_width=2)
+
+(scat * zero_point) * BOLD_line * nonBOLD_line * sample_point * proj_on_BOLD_line_point * proj_on_BOLD_residual_segment
+
+df['dBOLD'] = compute_residuals(df["C(TEi,TEj)"].values,df["C(TEk,TEl)"].values,BOLD_slope,0.0)
+
+scat_colored_by_dBOLD = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), 
+                                          size=.75, color='dBOLD', cmap='viridis',fontscale=1.3,
+                                          xlabel=r"$$FC_{C}(TE_{i},TE_{j})$$", ylabel=r"$$FC_{C}(TE_{k},TE_{l})$$").opts(title='',clim=(df['dBOLD'].quantile(0.01),df['dBOLD'].quantile(0.95)),colorbar_opts={"title": "Distance to BOLD line"})
+
+scat_colored_by_dBOLD * zero_point * BOLD_line
+
+# ## 4.3. Step 5: Distance to line indicating So dominated data
+
+proj_on_So_line             = project_points(sample_x,sample_y,So_slope,0.0)
+proj_on_So_line_point       = hv.Points(proj_on_So_line).opts(size=10,color='r', marker='s')
+proj_on_So_residual_segment = hv.Path([[(sample_x,sample_y), proj_on_So_line]]).opts(color="red", line_width=2)
+
+(scat * zero_point) * BOLD_line * nonBOLD_line * sample_point * proj_on_So_line_point * proj_on_So_residual_segment
+
+df['dSo'] = compute_residuals(df["C(TEi,TEj)"].values,df["C(TEk,TEl)"].values,1.0,0.0)
+
+scat_colored_by_dSo = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), 
+                                    size=.75, color='dSo', cmap='viridis',fontscale=1.3,
+                                          xlabel=r"$$FC_{C}(TE_{i},TE_{j})$$", ylabel=r"$$FC_{C}(TE_{k},TE_{l})$$").opts(title='',
+                                                                                 clim=(df['dSo'].quantile(0.01),df['dSo'].quantile(0.95)),
+                                                                                colorbar_opts={"title": "Distance to So line"})
+
+scat_colored_by_dSo * zero_point * nonBOLD_line
+
+# ## 4.4. Step 6: Preference towards BOLD line
+
+# Let's now see which line is the closest to each connection.
+# When the difference in distance is below the tolerance, we call it a tie and assign a 0.5
+pref1 = (df['dBOLD'] < df['dSo']).astype(float)
+ties = np.isclose(df['dBOLD'], df['dSo'], atol=1e-3)
+pref1[ties] = 0.5
+df['prefBOLD'] = pref1
+
+ticks = [0.25, 0.5, 0.75]
+labels = {0.25: "non-BOLD", 0.5:"Uncertain", 0.75: "BOLD"}
+scat_colored_by_prefBOLD = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), 
+                                    size=.75, color='prefBOLD', cmap=['#FF7F7F','#FFFF7F','lightgreen'],xlabel=r"$$FC_{C}(TE_{i},TE_{j})$$", ylabel=r"$$FC_{C}(TE_{k},TE_{l})$$", fontscale=1.3).opts(title='',
+                                                                                 clim=(df['dBOLD'].quantile(0.01),df['prefBOLD'].quantile(0.95)),
+                                                                                colorbar_opts={"title": "Line preference (e.g., likely behavior):","ticker": FixedTicker(ticks=ticks),
+                                                                                "major_label_overrides": labels,})
+
+scat_colored_by_prefBOLD * zero_point * BOLD_line * nonBOLD_line
+
+# ## 4.5. Step 7: Weigthed preference towards BOLD line
+
+weight_fn     = lambda r: np.power(r,1.0)
+max_weight_fn = lambda r: np.minimum(r,np.quantile(r,.95))
+
+r  = np.sqrt(x**2 + y**2)
+
+if weight_fn is None:
+    weight_fn = lambda r: r   # linear weight by radius
+w = weight_fn(r)
+if max_weight_fn is not None:
+    w = max_weight_fn(w)
+total_weight = w.sum()
+
+weighted_pref1 = (w * pref1)
+frac_line1 = weighted_pref1
+
+import matplotlib.colors as mcolors
+df['w'] = w
+df['w_prefBOLD'] = frac_line1
+colors = ['#FF7F7F','#FFFF7F','lightgreen']
+cmap = mcolors.LinearSegmentedColormap.from_list("green_yellow_red", colors)
+
+scat_colored_by_w = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), 
+                                    size=.75, color='w', cmap='gray_r',xlabel=r"$$FC_{C}(TE_{i},TE_{j})$$", ylabel=r"$$FC_{C}(TE_{k},TE_{l})$$", fontscale=1.3).opts(title='',
+                                                                                 clim=(df['w'].quantile(0.05),df['w'].quantile(0.95)),
+                                                                                colorbar_opts={"title": "Weights [Distance to origin]"})
+
+scat_colored_by_w * zero_point * BOLD_line * nonBOLD_line
+
+scat_colored_by_wprefBOLD = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), 
+                                    size=.75, color='w_prefBOLD', cmap=cmap,xlabel=r"$$FC_{C}(TE_{i},TE_{j})$$", ylabel=r"$$FC_{C}(TE_{k},TE_{l})$$", fontscale=1.3).opts(title='',
+                                                                                 clim=(df['w_prefBOLD'].quantile(0.05),df['w_prefBOLD'].quantile(0.95)),
+                                                                                colorbar_opts={"title": "Weigthed Pref. towards BOLD line"})
+
+scat_colored_by_wprefBOLD * zero_point * BOLD_line * nonBOLD_line
+
+# ## 4.7 Chord Distance
+
+# +
+import holoviews as hv
+import math
+import math
+from utils.basics import chord_distance_between_intersecting_lines
+
+def line_circle_intersection(m, b, r=1.0):
+    """
+    Find the coordinates where the line y = m*x + b intersects
+    the circle x^2 + y^2 = r^2 in the positive quadrant.
+
+    Args:
+        m (float): slope of the line
+        b (float): intercept of the line
+        r (float): radius of the circle (default = 1)
+
+    Returns:
+        (x, y) if an intersection exists in Q1
+        None if no such intersection exists
+    """
+    # Quadratic coefficients: (1+m^2)x^2 + 2mb x + (b^2 - r^2) = 0
+    A = 1 + m**2
+    B = 2 * m * b
+    C = b**2 - r**2
+
+    # Discriminant
+    D = B**2 - 4*A*C
+    if D < 0:
+        return None  # no real intersection
+
+    sqrtD = math.sqrt(D)
+
+    # Two possible solutions for x
+    x1 = (-B + sqrtD) / (2*A)
+    x2 = (-B - sqrtD) / (2*A)
+
+    # Corresponding y
+    y1 = m * x1 + b
+    y2 = m * x2 + b
+
+    candidates = [(x1, y1), (x2, y2)]
+
+    # Return the one in the positive quadrant
+    for (x, y) in candidates:
+        if x >= 0 and y >= 0:
+            return (x, y)
+
+    return None  # no intersection in Q1
+
+
+# +
+# CASE 1:
+x_te1,x_te2='e01','e03'
+y_te1,y_te2='e03','e03'
+BOLD_slope = (echo_times_dict[y_te1]*echo_times_dict[y_te2])/(echo_times_dict[x_te1]*echo_times_dict[x_te2])
+BOLD_line  = hv.Slope(BOLD_slope,0).opts(line_width=3, line_color='g', line_dash='dashed') 
+
+# Create an Ellipse element with center (0,0) and diameter 2 (radius 1)
+unit_circle            = hv.Ellipse(0, 0, 1).opts(line_dash='dashed')
+BOLD_point_on_circle   = np.array(line_circle_intersection(BOLD_slope,0.0,r=0.5))
+So_point_on_circle     = np.array(line_circle_intersection(So_slope,0.0,r=0.5))
+BOLD_dot               = hv.Points([BOLD_point_on_circle]).opts(size=5,color='g')
+So_dot                 = hv.Points([So_point_on_circle]).opts(size=5,color='r')
+BOLD2So_path           = hv.Path([[BOLD_point_on_circle, So_point_on_circle]]).opts(color="black", line_width=2)
+segment                = np.sqrt((So_point_on_circle-BOLD_point_on_circle)**2)/2
+BOLD2So_path_middle    = np.array([So_point_on_circle[0]-segment[0],So_point_on_circle[1]+segment[1]])
+line_with_dist = hv.Arrow(BOLD2So_path_middle[0],BOLD2So_path_middle[1],'%.2f' % chord_distance_between_intersecting_lines(1.0, BOLD_slope, r=0.5),'^')
+
+(scat.opts(colorbar=False) * BOLD_line * nonBOLD_line * zero_point * unit_circle * BOLD_dot * So_dot * BOLD2So_path * line_with_dist).opts(xlim=(-.51,.51), ylim=(-.51,.51), aspect='square', fontscale=1.3, 
+                                                                                                                          xlabel=r"$$FC_{C}$$"+ "(%.1f,%.1f)"%(echo_times_dict[x_te1],echo_times_dict[x_te2]), 
+                                                                                                                          ylabel=r"$$FC_{C}$$"+ "(%.1f,%.1f)"%(echo_times_dict[y_te1],echo_times_dict[y_te2]))
+
+# +
+# CASE 1:
+x_te1,x_te2='e02','e02'
+y_te1,y_te2='e02','e03'
+BOLD_slope = (echo_times_dict[y_te1]*echo_times_dict[y_te2])/(echo_times_dict[x_te1]*echo_times_dict[x_te2])
+BOLD_line  = hv.Slope(BOLD_slope,0).opts(line_width=3, line_color='g', line_dash='dashed') 
+
+# Create an Ellipse element with center (0,0) and diameter 2 (radius 1)
+unit_circle            = hv.Ellipse(0, 0, 1).opts(line_dash='dashed')
+BOLD_point_on_circle   = np.array(line_circle_intersection(BOLD_slope,0.0,r=0.5))
+So_point_on_circle     = np.array(line_circle_intersection(So_slope,0.0,r=0.5))
+BOLD_dot               = hv.Points([BOLD_point_on_circle]).opts(size=5,color='g')
+So_dot                 = hv.Points([So_point_on_circle]).opts(size=5,color='r')
+BOLD2So_path           = hv.Path([[BOLD_point_on_circle, So_point_on_circle]]).opts(color="black", line_width=2)
+segment                = np.sqrt((So_point_on_circle-BOLD_point_on_circle)**2)/2
+BOLD2So_path_middle    = np.array([So_point_on_circle[0]-segment[0],So_point_on_circle[1]+segment[1]])
+line_with_dist = hv.Arrow(BOLD2So_path_middle[0],BOLD2So_path_middle[1],'%.2f' % chord_distance_between_intersecting_lines(1.0, BOLD_slope, r=0.5),'^')
+
+(scat.opts(colorbar=False) * BOLD_line * nonBOLD_line * zero_point * unit_circle * BOLD_dot * So_dot * BOLD2So_path * line_with_dist).opts(xlim=(-.51,.51), ylim=(-.51,.51), aspect='square', fontscale=1.3, 
+                                                                                                                          xlabel=r"$$FC_{C}$$"+ "(%.1f,%.1f)"%(echo_times_dict[x_te1],echo_times_dict[x_te2]), 
+                                                                                                                          ylabel=r"$$FC_{C}$$"+ "(%.1f,%.1f)"%(echo_times_dict[y_te1],echo_times_dict[y_te2]))
+# -
+
+# # 5. Supplementary Figure:  Demonstration of heteroscedasticity
+#
+# ## 5.1. SP X.a: Linear fit is not great
 
 # +
 x_te1,x_te2 = 'e01','e02'
 y_te1,y_te2 = 'e02','e03'
-a = sym_matrix_to_vec(fc['C','MGSBJ05','constant_gated','ALL_Tedana-robustica',(x_te1,x_te2)].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C','MGSBJ05','constant_gated','ALL_Tedana-robustica',(y_te1,y_te2)].values,discard_diagonal=True)
+a = sym_matrix_to_vec(fc['C','MGSBJ05','constant_gated','ALL_Tedana-fastica',(x_te1,x_te2)].values,discard_diagonal=True)
+b = sym_matrix_to_vec(fc['C','MGSBJ05','constant_gated','ALL_Tedana-fastica',(y_te1,y_te2)].values,discard_diagonal=True)
 df = pd.DataFrame([a,b], index=['C(TE1,TE2)','C(TE2,TE3)']).T
 
 zero_point = hv.HLine(0).opts(line_width=0.5, line_color='k', line_dash='dotted') * hv.VLine(0).opts(line_width=0.5, line_color='k', line_dash='dotted')
 
-scat_datashaded = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE2,TE3)', aspect='square', xlim=(-.1,.5), ylim=(-.1,.5), datashade=True).opts(title='(a) Real Data')
+scat_datashaded = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE2,TE3)', aspect='square', xlim=(-.1,.5), ylim=(-.1,.5), datashade=True).opts(title='(a) Real Data', active_tools=['reset'])
 scat = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE2,TE3)', aspect='square', xlim=(-.1,.5), ylim=(-.1,.5))
 
 nonBOLD_line = hv.Slope(1,0).opts(line_width=3, line_color='r', line_dash='dashed')
@@ -221,10 +454,10 @@ print(data_fit)
 print((echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02']))
 (scat_datashaded * nonBOLD_line * BOLD_line * zero_point)
 
-# # Figure 2.a Describing the Heterocedasticity issue
-
 print(data_fit[0],data_fit[1])
 (scat_datashaded * nonBOLD_line * BOLD_line * data_line * zero_point)
+
+# ## 4.2 b| LOWESS Plot
 
 # +
 from statsmodels.stats.diagnostic import het_breuschpagan
@@ -261,7 +494,7 @@ smoothed = lowess(df2['Residuals'], df2['Fitted'], frac=0.3)
 smooth_df = pd.DataFrame(smoothed, columns=['Fitted', 'Residuals'])
 
 # Scatter plot of residuals
-scatter = df2.hvplot.scatter(x='Fitted', y='Residuals', alpha=0.7, size=3, color='k', datashade=True, ylim=(-.1,.2), xlim=(-.1,.2))
+scatter = df2.hvplot.scatter(x='Fitted', y='Residuals', alpha=0.7, size=3, color='k', datashade=True, ylim=(-.1,.2), xlim=(-.1,.2)).opts(active_tools=['reset'])
 
 # Smoothed curve
 smooth_curve = smooth_df.hvplot.line(x='Fitted', y='Residuals', color='red', name='LOWESS Fit')
@@ -275,378 +508,34 @@ zero_line = hv.HLine(0).opts(color='black', line_dash='dashed', line_width=0.5)
     width=600, height=400,
     xlabel='Fitted values', ylabel='Residuals')
 # -
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ***
-
-hvplot_fc(fc['R',bad_scan[0],bad_scan[1],'ALL_Basic',('e02','e02')],
-          major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
-          cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left', cbar_title="Pearson's Correlation:",cbar_title_fontsize=14,ticks_font_size=14).opts(default_tools=["pan"]).opts(title='Cardiac Gated | Basic Denoising | No Censoring') + \
-hvplot_fc(fc['R',bad_scan[0],bad_scan[1],'ALL_Tedana',('e02','e02')],
-          major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
-          cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left', cbar_title="Pearson's Correlation:",cbar_title_fontsize=14,ticks_font_size=14).opts(default_tools=["pan"]).opts(title='Cardiac Gated | Tedana Denoising | No Censoring')
-
-# ***
-# # 4. How does FC-R behave across echoes?
+# # 6. Draw an example of FC following two different denosing methods and the difficulty with deciding which one is best
 #
-# ## 4.1. General Behavior with no approximations
-# Let's describe the mono-exponential decay signal at two locations (x and y) for two different echo times (TEi and TEj) as follows:
-# $$s_{x,i}=s(x,t,TE_i)=\Delta\rho(x,t)-\Delta R_2^*(x,t)\cdot TE_i + \epsilon(x,t) = \Delta\rho_{x} - {\Delta R_2^*}_{x} \cdot TE_i + \epsilon_{x}\tag{1}$$
-#
-# $$s_{y,j}=s(y,t,TE_j)=\Delta\rho(y,t)-\Delta R_2^*(y,t)\cdot TE_j + \epsilon(y,t)= \Delta\rho_{y} - {\Delta R_2^*}_{y} \cdot TE_i + \epsilon_{y}\tag{2}$$
-#
-# where $\Delta\rho$ denotes fluctuations in net magnetization, $\Delta R_2^*$ fluctuations of BOLD origin and $\epsilon$ is the thermal noise.
-#
-# Moreover, functional connectivity between two locations $x$ and $y$ is often estimated in terms of Pearson's Correlation Eq $(3)$ as follows:
-#
-# $$R(s_{x,i},s_{y,j}) = R_{xi,yj} = \frac{\sum{(s_{x,i}-\overline{s_{x,i}}) \cdot (s_{y,j}-\overline{s_{y,j}})}} {\sqrt{ \sum{(s_{x,i}-\overline{s_{x,i}})^2} \cdot \sum{(s_{y,i}-\overline{s_{x,i}})^2} }} \tag{3}$$
-#
-# Becuase $s$ here always represents signals in units of signal percent change, its mean is zero (e.g., $\overline{s_{x,i}}=\overline{s_{y,j}}=0$), and therefore Eq. $(3)$ can be simplified as follows:
-#
-# $$R_{xi,yj} = \frac{\sum{s_{x,i} \cdot s_{y,j}}} {\sqrt{ \sum{s_{x,i}^2} \cdot \sum{s_{y,j}^2} }} \tag{4}$$
-#
-# Under no additional assumptions, we have the following formula, which is hard to simplify once we expand the multiplicative terms
-#
-#
-# $$R_{xi,yj} = \frac{\sum{(\Delta\rho_{x} - {\Delta R_2^*}_{x} \cdot TE_i + \epsilon_{x}) \cdot (\Delta\rho_{y} - {\Delta R_2^*}_{y} \cdot TE_j + \epsilon_{y})}} {\sqrt{ \sum{(\Delta\rho_{x} - {\Delta R_2^*}_{x} \cdot TE_i+ \epsilon_{x})^2} \cdot \sum{(\Delta\rho_{y} - {\Delta R_2^*}_{y} \cdot TE_j+ \epsilon_{y})^2} }} \tag{5}$$
-#
-#
-# ## 4.2 BOLD Fluctuations dominate over everything else
-#
-# Mathematically, this can be expresses as follows:
-#
-# $${\Delta R_2^*} \cdot TE >> \Delta\rho + \epsilon \tag{6}$$
-#
-# Consequently, the signal equation can be simplified as follows:
-#
-# $$s_{x,i}\approx- {\Delta R_2^*}_{x} \cdot TE_i \land s_{y,j}\approx- {\Delta R_2^*}_{y} \cdot TE_j \tag{7}$$
-#
-# If we introduce this simplified formulation of the recorded signals, we can observe the following
-#
-# $$R_{xi,yj} \approx \frac{\sum{(- {\Delta R_2^*}_{x}\cdot TE_i) \cdot (- {\Delta R_2^*}_{y}\cdot TE_j)}} {\sqrt{ \sum{(- {\Delta R_2^*}_{x} \cdot TE_i)^2} \cdot \sum{(- {\Delta R_2^*}_{y} \cdot TE_j)^2} }}= \frac{(TE_i \cdot TE_j) \sum{({\Delta R_2^*}_{x} \cdot {\Delta R_2^*}_{y})}} {(TE_i \cdot TE_j) \cdot \sqrt{ \sum{(- {\Delta R_2^*}_{x})^2} \cdot \sum{(- {\Delta R_2^*}_{y})^2} }} =  \frac{\sum{({\Delta R_2^*}_{x} \cdot {\Delta R_2^*}_{y})}} {\sqrt{ \sum{(- {\Delta R_2^*}_{x})^2} \cdot \sum{(- {\Delta R_2^*}_{y})^2} }} \tag{8}$$
-#
-# <center><u><b>FC-R in this scenario is TE-independent</b></u></center>
-#
-# ## 4.3 Non-BOLD Fluctuations dominate over everything else
-#
-# In this scenario, we are assuming that
-#
-# $${\Delta R_2^*} \cdot TE << \Delta\rho + \epsilon \tag{9}$$
-#
-# And therefore, the signal at a given location and echo time can be simplified as:
-#
-# $$s_{x,i} \approx  \Delta\rho_{x} + \epsilon_{x}\tag{10}$$
-#
-# Moreover, FC-R in this case reduces to 
-#
-# $$R_{xi,yj} \approx \frac{\sum{(\Delta\rho_{x} + \epsilon_{x})\cdot (\Delta\rho_{y} + \epsilon_{y})}}{\sqrt{\sum{(\Delta\rho_{x} + \epsilon_{x})^2}}\cdot\sqrt{\sum{(\Delta\rho_{y} + \epsilon_{y})^2}}}$$
-#
-# Nothing in the above formula depends on echo time, and therfore:
-#
-# <center><u><b>FC-R in this scenario is TE-independent</b></u></center>
-# <br>
-# <center><h4>In summary, FC-R is TE independent when the data is dominated by a single form of fluctuation, no matter whether that is BOLD or non-BOLD fluctuations</h4></center>
+# Below we show the full brain R-FC matrices of a single scan for the basic (left) and tedana (right) pipelines. Just by looking at then, it not easy to discern which of these two matrices is a more truthful representation of neurally-driven connectivity.
 
-# +
-zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
-
-np.random.seed(50)
-sample_pairs = np.random.choice(echo_pairs,2,False)
-print(sample_pairs)
-plots = pn.Row()
-for (sbj,ses),scenario, label in zip([good_scan,bad_scan],['ALL_Tedana-fastica','ALL_Basic'],['Const. Gated,Tedana -> BOLD Dominated','Cardiac Gated,Basic -> Non-BOLD Dominated']):
-    aux_fc_x = sym_matrix_to_vec(fc['R',sbj, ses, scenario,tuple(sample_pairs[0].split('|'))].values,discard_diagonal=True)
-    aux_fc_y = sym_matrix_to_vec(fc['R',sbj, ses, scenario,tuple(sample_pairs[1].split('|'))].values,discard_diagonal=True)
-    e1_X,e2_X = sample_pairs[0].split('|')
-    e1_Y,e2_Y = sample_pairs[1].split('|')
-    
-    df = pd.DataFrame([aux_fc_x,aux_fc_y], index=['FC-R (%s,%s)' % tuple(sample_pairs[0].split('|')),'FC-R (%s,%s)' % tuple(sample_pairs[1].split('|'))]).T
-
-    plot = df.hvplot.hexbin(x=df.columns[0], y=df.columns[1], aspect='square',
-                         color='black').opts(fontscale=1, title=label, xlim=(-.5,1),ylim=(-.5,1)) * \
-           hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * \
-           zero_marker
-    plots.append(plot)
-# -
-
-plots
-
-# # 5. How does FC-C behave across echoes?
-# ## 5.1. General Behavior with no approximations
-#
-# If one estimates FC using covariance (instead of correlation), then FC is expressed as follows:
-#
-# $$C(s_{x,i},s_{y,j}) = C_{xi,yj} = \frac{1}{N_{t}} \cdot \sum{(s_{x,i}-\overline{s_{x,i}}) \cdot (s_{y,j}-\overline{s_{y,j}})} \tag{11}$$
-#
-# Again, becuase $s$ here always represents signals in units of signal percent change, its mean is zero (e.g., $\overline{s_{x,i}}=\overline{s_{y,j}}=0$), and therefore Eq. $(11)$ can be simplified as follows:
-#
-# $$C_{xi,yj} = \frac{1}{N_{t}} \cdot \sum{(s_{x,i} \cdot s_{y,j})} = \frac{1}{N_{t}} \cdot \sum{(\Delta\rho_{x} - {\Delta R_2^*}_{x} \cdot TE_i + \epsilon_{x}) \cdot (\Delta\rho_{y} - {\Delta R_2^*}_{y} \cdot TE_j + \epsilon_{x})}  \tag{12}$$
-#
-# ## 5.2 BOLD Fluctuations dominate over everything else
-#
-# Mathematically, this can be expresses as follows:
-#
-# $${\Delta R_2^*} \cdot TE >> \Delta\rho + \epsilon \tag{13}$$
-#
-# Consequently, the signal equation can be simplified as follows:
-#
-# $$s_{x,i}\approx- {\Delta R_2^*}_{x} \cdot TE_i \land s_{y,j}\approx- {\Delta R_2^*}_{y} \cdot TE_j \tag{14}$$
-#
-# If we introduce this simplified formulation of the recorded signals, we can observe the following
-#
-# $$C_{xi,yj} \approx \frac{1}{N_{t}} \cdot \sum{(- {\Delta R_2^*}_{x} \cdot TE_i) \cdot (- {\Delta R_2^*}_{y} \cdot TE_j)} = TE_i \cdot TE_j\cdot \frac{1}{N_t}\sum{{\Delta R_2^*}_{x} \cdot {\Delta R_2^*}_{y}} \tag{15}$$
-#
-# <center><b><u>And therefore FC-C in this scenario is expected to be echo time dependent</u></b></center>
-#
-# > This means that now if we plot FC-C computed with one pair of echo times against FC-C computed using a different set of echo times, we should not expect it to fall over the identity line (black line below), but over a line with zero intercept and a slope proportional to the ratio of the contributing echo times. This is exemplified in the following figure.
-#
-# ## 5.3 Non-BOLD Fluctuations dominate over everything else
-#
-# In this scenario, we are assuming that
-#
-# $${\Delta R_2^*} \cdot TE << \Delta\rho + \epsilon \tag{9}$$
-#
-# And therefore, the signal at a given location and echo time can be simplified as:
-#
-# $$s_{x,i} \approx  \Delta\rho_{x} + \epsilon_{x}\tag{10}$$
-#
-# Moreover, FC-C in this case reduces to:
-#
-# $$C_{xi,yj} = \frac{1}{N_{t}} \cdot \sum{(s_{x,i} \cdot s_{y,j})} = \frac{1}{N_{t}} \cdot \sum{(\Delta\rho_{x} + \epsilon_{x}) \cdot (\Delta\rho_{y} + \epsilon_{x})}  \tag{16}$$
-#
-# Nothing in the above formula depends on echo time, and therfore:
-#
-# <center><u><b>FC-R in this scenario is TE-independent</b></u></center>
-# <br>
-# <center><h4>In summary, FC-C is TE dependent when the data is dominated BOLD fluctuations and TE independent otherwise</h4></center>
-
-# +
-zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
-
-np.random.seed(51)
-sample_pairs = np.random.choice(echo_pairs,2,False)
-print(sample_pairs)
-plots = pn.Row()
-for (sbj,ses),scenario, label in zip([good_scan,bad_scan],['ALL_Tedana-fastica','ALL_Basic'],['Const. Gated,Tedana -> BOLD Dominated','Cardiac Gated,Basic -> Non-BOLD Dominated']):
-    aux_fc_x = sym_matrix_to_vec(fc['C',sbj, ses, scenario,tuple(sample_pairs[0].split('|'))].values,discard_diagonal=True)
-    aux_fc_y = sym_matrix_to_vec(fc['C',sbj, ses, scenario,tuple(sample_pairs[1].split('|'))].values,discard_diagonal=True)
-    # Allow line to not go thorugh zero
-    #emp_slope, emp_intercept = np.polyfit(aux_fc_x,aux_fc_y,deg=1)
-    # Force line to go throught zero
-    emp_slope = np.dot(aux_fc_x, aux_fc_y) / np.dot(aux_fc_x, aux_fc_x)
-    emp_intercept= 0
-    
-    e1_X,e2_X = sample_pairs[0].split('|')
-    e1_Y,e2_Y = sample_pairs[1].split('|')
-    th_slope  = (echo_times_dict[e1_Y]*echo_times_dict[e2_Y])/(echo_times_dict[e1_X]*echo_times_dict[e2_X])
-
-    df = pd.DataFrame([aux_fc_x,aux_fc_y], index=['FC-C (%s,%s)' % tuple(sample_pairs[0].split('|')),'FC-C (%s,%s)' % tuple(sample_pairs[1].split('|'))]).T
-
-    plot = df.hvplot.hexbin(x=df.columns[0], y=df.columns[1], aspect='square',
-                         color='black').opts(fontscale=1, title=label, xlim=(-1,3),ylim=(-1,3)) * \
-           hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=2) * \
-           hv.Slope(th_slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * zero_marker * \
-           hv.Slope(emp_slope,emp_intercept).opts(line_color='b',line_dash='dashed',line_width=2) 
-
-    plots.append(plot)
-plots
-# -
-
-# ***
-
-# +
-zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
-a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana-fastica',('e01','e02')].values,discard_diagonal=True)
-b = a + 0.1 * (np.random.rand(25425) - .5)
-df = pd.DataFrame([a,b], index=['FC-R (TE1,TE2)','FC-R (TE1,TE3)']).T
-plot_simulation = df.hvplot.scatter(x='FC-R (TE1,TE2)',y='FC-R (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-R (TEi,TEj)', ylabel='FC-R (TEk,TEl)').opts(fontscale=1.5, title='Simulated behavior for FC-R')  * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
-
-c = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana-fastica',('e01','e03')].values,discard_diagonal=True)
-df = pd.DataFrame([a,c], index=['FC-R (TE1,TE2)','FC-R (TE1,TE3)']).T
-plot_real_data = df.hvplot.scatter(x='FC-R (TE1,TE2)',y='FC-R (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-R (TE1,TE2)', ylabel='FC-R (TE1,TE3)').opts(fontscale=1.5, title='Empirical data') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
-
-header = pn.pane.Markdown("""
-# Exmaple of how FC-R is expected to behave across echoes. \n
-
-Theory says that independenly of what noise source dominates the data, FC-R should be echo time independent. The simulation on the left,
-and the represenative data on the right shows this behavior in the form of a scatter plot of FC-R between two different echo combinations.
-As FC-R is expected to be echo independent, data sits approximately on the identity line (Slope=1, Intercept=0) plot_simulation + plot_real_data""", width=800)
-
-output = pn.Column(header,plot_simulation + plot_real_data)
-#output.save('../../results/FCR_theoretical_behavior_across_echoes.html')
-output
-
-# +
-zero_marker = hv.VLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray') * hv.HLine(0).opts(line_width=0.5, line_dash='dashed', line_color='gray')
-a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e02')].values,discard_diagonal=True)
-b = a + 0.1 * (np.random.rand(25425) - .5)
-df = pd.DataFrame([a,b], index=['C(TE1,TE2)','C(TE1,TE3)']).T
-plot_simulation = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TEi,TEj)', ylabel='C(TEk,TEl)', xlim=(-.1,.4), ylim=(-.1,.6)).opts(fontscale=1.2, title='(a) Simulation') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
-
-c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e03')].values,discard_diagonal=True)
-df = pd.DataFrame([a,c], index=['C(TE1,TE2)','C(TE1,TE3)']).T
-plot_real_data = df.hvplot.scatter(x='C(TE1,TE2)',y='C(TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='C(TE1,TE2)', ylabel='C(TE1,TE3)', xlim=(-.1,.4), ylim=(-.1,.6)).opts(fontscale=1.2, title='(b) Real Data') * hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * zero_marker
-
-header = pn.pane.Markdown("""
-# Exmaple of how FC-C is expected to behave across echoes. \n
-
-Theory says that independenly of what noise source dominates the data, FC-R should be echo time independent. The simulation on the left,
-and the represenative data on the right shows this behavior in the form of a scatter plot of FC-R between two different echo combinations.
-As FC-R is expected to be echo independent, data sits approximately on the identity line (Slope=1, Intercept=0) plot_simulation + plot_real_data""", width=800)
-
-output = pn.Column(header,plot_simulation + plot_real_data)
-#output.save('../../results/FCR_theoretical_behavior_across_echoes.html')
-output
-
-# +
-a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e02')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e02','e03')].values,discard_diagonal=True)
-theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
-df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
-plot_simulation = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-C (TE1,TE2)', ylabel='FC-C (TE2,TE3)').opts(fontscale=1.5, title='First set of TE pairs', xlim=(-.1,.3), ylim=(-.1,0.3)) * \
-                  hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2)  * \
-                  hv.Slope(theoretical_slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * \
-                  hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
-                  zero_marker
-
-c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_Tedana-fastica',('e01','e03')].values,discard_diagonal=True)
-theoretical_slope= (echo_times_dict['e01']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
-df = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE1,TE3)']).T
-empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
-plot_real_data = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-C (TE1,TE2)', ylabel='FC-C (TE1,TE3)').opts(fontscale=1.5, title='Second set of TE pairs', xlim=(-.1,.3), ylim=(-.1,0.3)) * \
-                 hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * \
-                 hv.Slope(theoretical_slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * \
-                 hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
-                 zero_marker
-
-header = pn.pane.Markdown("""
-# Exmaple of how FC-C is expected to behave across echoes. \n
-""")
-output = pn.Column(header,plot_simulation + plot_real_data)
-output.save('../../results/FCC_theoretical_behavior_across_echoes.html')
-output
-
-# +
-a = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GS',('e01','e02')].values,discard_diagonal=True)
-b = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GS',('e02','e03')].values,discard_diagonal=True)
-theoretical_slope= (echo_times_dict['e02']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
-df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
-
-plot_simulation = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-C (TE1,TE2)', ylabel='FC-C (TE2,TE3)').opts(fontscale=1.5, title='First set of TE pairs', xlim=(-.1,.3), ylim=(-.1,0.3)) * \
-                  hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * \
-                  hv.Slope(theoretical_slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * \
-                  hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
-                  zero_marker
-
-c = sym_matrix_to_vec(fc['C',sbj,ses,'ALL_GS',('e01','e03')].values,discard_diagonal=True)
-theoretical_slope= (echo_times_dict['e01']*echo_times_dict['e03'])/(echo_times_dict['e01']*echo_times_dict['e02'])
-df = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE1,TE3)']).T
-empirical_slope, empirical_intercept = np.polyfit(df[df.columns[0]],df[df.columns[1]],deg=1)
-
-plot_real_data = df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE1,TE3)', aspect='square',color='black', datashade=True, xlabel='FC-C (TE1,TE2)', ylabel='FC-C (TE1,TE3)').opts(fontscale=1.5, title='Second set of TE pairs', xlim=(-.1,.3), ylim=(-.1,0.3)) * \
-                 hv.Slope(1,0).opts(line_color='k',line_dash='dashed',line_width=2) * \
-                 hv.Slope(theoretical_slope,0).opts(line_color='g',line_dash='dashed',line_width=2) * \
-                 hv.Slope(empirical_slope,empirical_intercept).opts(line_color='b',line_dash='dashed',line_width=2) * \
-                 zero_marker
-
-header = pn.pane.Markdown("""
-# Exmaple of how FC-C is expected to behave across echoes. \n
-""")
-output = pn.Column(header,plot_simulation + plot_real_data)
-output.save('../../results/FCC_theoretical_behavior_across_echoes.html')
-output
-# -
-
-# ***
-
-a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e02','e02')].values,discard_diagonal=True)
-b = a + 0.1 * (np.random.rand(25425) - .5)
-df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-c = 2.3*a + 0.1 * (np.random.rand(25425) - .5)
-df2 = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)').opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3) * \
-df2.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True).opts(fontscale=1.5) * hv.Slope(2.3,0).opts(line_color='g',line_dash='dashed',line_width=3)
-
-a = sym_matrix_to_vec(fc['R',sbj,ses,'ALL_Tedana',('e02','e02')].values,discard_diagonal=True)
-b = a + 0.1 * (np.random.rand(25425) - .5)
-df = pd.DataFrame([a,b], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-c = 2.3*a + 0.1 * (np.random.rand(25425) - .5)
-df2 = pd.DataFrame([a,c], index=['FC-C (TE1,TE2)','FC-C (TE2,TE3)']).T
-pn.Row(df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)', xlim=(-.4,1.6), ylim=(-.4,1.6)).opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3),
-df.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True, xlabel='FC-C (TEi,TEj)', ylabel='FC-C (TEk,TEl)', xlim=(-.4,1.6), ylim=(-.4,1.6)).opts(fontscale=1.5) * hv.Slope(1,0).opts(line_color='r',line_dash='dashed',line_width=3) * \
-df2.hvplot.scatter(x='FC-C (TE1,TE2)',y='FC-C (TE2,TE3)', aspect='square',c='r',s=1, datashade=True).opts(fontscale=1.5) * hv.Slope(2.3,0).opts(line_color='g',line_dash='dashed',line_width=3))
-
-# +
-import numpy as np
-
-def variance_explained(x, y, degree):
-    """
-    Calculates the variance explained (R^2) by a polynomial fit.
-
-    Args:
-        x (array-like): Independent variable data.
-        y (array-like): Dependent variable data.
-        degree (int): Degree of the polynomial to fit.
-
-    Returns:
-        float: The variance explained (R^2), ranging from 0 to 1.
-               Values closer to 1 indicate a better fit.
-    """
-    # Fit the polynomial
-    coeffs = np.polyfit(x, y, degree)
-    p = np.poly1d(coeffs)
-    # Calculate the total sum of squares (SST)
-    y_mean = np.mean(y)
-    sst = np.sum((y - y_mean)**2)
-
-    # Calculate the sum of squared residuals (SSR)
-    ssr = np.sum((y - p(x))**2)
-
-    # Calculate R-squared
-    r_squared = 1 - (ssr / sst)
-
-    return r_squared,coeffs
-# -
+scan_select      = pn.widgets.Select(name='Sample scan', options=sample_scans_select, width=200)
+scenarioA_select = pn.widgets.Select(name='Left Configuration', options=scenarios_select_dict, width=200)
+scenarioB_select = pn.widgets.Select(name='Right Configuration', options=scenarios_select_dict, width=200)
+conf_card        = pn.Card(scan_select,scenarioA_select,scenarioB_select, title='Configuration')
 
 
+def plot_matrix(scan,scenario,fc_metric='C',echo_pair=('e01','e02'), title=''):
+    sbj_id = scan[0]
+    run_id = scan[1]
+    data   = fc[fc_metric,sbj_id,run_id,scenario,echo_pair]
+    plot   = hvplot_fc(data,major_label_overrides='regular_grid', net_cmap=power264_nw_cmap,
+                       cmap='RdBu_r', by='Network', add_labels=False, colorbar_position='left', 
+                       cbar_title=f"FC-{fc_metric}", cbar_title_fontsize=14, ticks_font_size=14).opts(tools=[],title=title)
+    return plot
+@pn.depends(scan_select,scenarioA_select)
+def plot_left_matrix(scan,scenario):
+    return plot_matrix(scan,scenario, title='Scenario B: '+ scenario)
+@pn.depends(scan_select,scenarioB_select)
+def plot_right_matrix(scan,scenario):
+    return plot_matrix(scan,scenario, title='Scenario A:' + scenario)   
+
+
+dashboard = pn.Row(conf_card,plot_left_matrix, plot_right_matrix)
+
+dashboard_server = dashboard.show(port=port_tunnel)
+
+dashboard.stop()

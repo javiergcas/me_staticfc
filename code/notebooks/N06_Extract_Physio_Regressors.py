@@ -247,16 +247,16 @@ with open(script_path, 'w') as the_file:
     the_file.write(f'# swarm -f {script_path} -g 8 -t 8 -b 20 --time 00:10:00 --logdir {log_path} --partition quick,norm --module afni \n')
     the_file.write('\n')
     for sbj,ses in tqdm(selected_scans):
-        gs_path      = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.spc.GS.1D')
+        gs_path      = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.GS.1D') #f'pb03.{sbj}.r01.e02.volreg.spc.GS.1D')
         slibase_path = osp.join(PRCS_DATA_DIR,sbj,'D04_Physio',f'{sbj}_{ses}_task-rest_echo-2_slibase.1D')
-        output_path  = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.spc.GS.PhysioModeling.pkl')
+        output_path  = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.GS.PhysioModeling.pkl') #f'pb03.{sbj}.r01.e02.volreg.spc.GS.PhysioModeling.pkl')
         the_file.write(f'export GS_PATH={gs_path} PHYSIO_PATH={slibase_path} OUTPUT_PATH={output_path}; sh {CODE_DIR}/python/GS_physio_exp_var.sh\n')
 the_file.close()     
 
 # The next cell help us look for issues when running the batch jobs. If all things went well there should be no WARNING lines printed out.
 
 for sbj,ses in tqdm(selected_scans):
-    output_path  = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'pb03.{sbj}.r01.e02.volreg.scale.GSasis.PhysioModeling.pkl')
+    output_path  = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.GS.PhysioModeling.pkl')
     if not osp.exists(output_path):
         print("++ WARNING: %s is missing" % output_path)
 
@@ -265,7 +265,7 @@ for sbj,ses in tqdm(selected_scans):
 df = pd.DataFrame(index=selected_scans,columns=['Var. Exp. by Physio Regressors'])
 for sbj,ses in tqdm(selected_scans):
     # Variance Explained by Regressors
-    model_path  = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'pb03.{sbj}.r01.e02.volreg.scale.GSasis.PhysioModeling.pkl')
+    model_path  = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.GS.PhysioModeling.pkl')
     model = sm.load(model_path)
     df.loc[(sbj,ses),'Var. Exp. by Physio Regressors'] = model.rsquared
 df=df.infer_objects()
@@ -279,12 +279,12 @@ df.to_csv('./cache/real_varexp_gs_physio.csv')
 #
 # ### 4.1. Create path for swarm file
 
-script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N09c_Compute_varexp_in_GS_by_physio_nulls.SWARM.sh')
+script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N06c_Compute_varexp_in_GS_by_physio_nulls.SWARM.sh')
 print(script_path)
 
 # ### 4.2. Create folder for logs
 
-log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N09c_Compute_varexp_in_GS_by_physio_nulls.log')
+log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N06c_Compute_varexp_in_GS_by_physio_nulls.log')
 if not osp.exists(log_path):
     os.makedirs(log_path)
 print(log_path)
@@ -310,8 +310,8 @@ with open(script_path, 'w') as the_file:
         ii = str(i).zfill(5)
         gs_sbj, gs_ses = selected_scans_df.sample(1).index.values[0]
         ph_sbj, ph_ses = pd.DataFrame(index=selected_scans.drop(gs_sbj,level='Subject')).sample(1).index.values[0]
-        gs_path        = osp.join(PRCS_DATA_DIR,gs_sbj,f'D02_Preproc_fMRI_{gs_ses}',f'pb03.{gs_sbj}.r01.e02.volreg.scale.GSasis.1D')
-        ph_path        = osp.join(PRCS_DATA_DIR,ph_sbj,'D06_Physio',f'{ph_sbj}_{ph_ses}_task-rest_echo-2_slibase.1D')
+        gs_path        = osp.join(PRCS_DATA_DIR,gs_sbj,f'D03_Preproc_{gs_ses}_NORDIC-off',f'pb03.{gs_sbj}.r01.e02.volreg.GS.1D')
+        ph_path        = osp.join(PRCS_DATA_DIR,ph_sbj,'D04_Physio',f'{ph_sbj}_{ph_ses}_task-rest_echo-2_slibase.1D')
         out_path       = osp.join(perm_dir,f'gs_phys_varex_{ii}.pkl')
         the_file.write(f'export GS_PATH={gs_path} PHYSIO_PATH={ph_path} OUTPUT_PATH={out_path}; sh {CODE_DIR}/python/GS_physio_exp_var.sh\n')
 the_file.close()     
@@ -337,6 +337,20 @@ df.index.name='Permutation'
 df.to_csv('./cache/null_varexp_gs_physio.csv')
 
 # ***
+
+df_real = pd.read_csv('./cache/real_varexp_gs_physio.csv')
+df_null = pd.read_csv('./cache/null_varexp_gs_physio.csv', index_col=[0])
+p05_val = df_null.quantile(0.95).values[0]
+
+df_null.hvplot.kde(label='Null Distribution') * df_real.hvplot.kde(label='Real Data') * hv.VLine(p05_val).opts(line_color='k',line_width=0.5,line_dash='dashed')
+
+Scans for which physio regressors explain a significant amount of variance from the global signal
+
+df_real[df_real['Var. Exp. by Physio Regressors']> p05_val]
+
+df_null.quantile(0.95)
+
+# ***
 #
 # # CODE TO DELETE
 #
@@ -356,16 +370,16 @@ df_null.hvplot.kde()
 df = pd.DataFrame(index=selected_scans,columns=['Varexp. by Physio','kappa','rho','Mean Motion (enorm)','Max Motion (enorm)'])
 for sbj,ses in tqdm(selected_scans):
     # Variance Explained by Regressors
-    model_path  = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'pb03.{sbj}.r01.e02.volreg.scale.GSasis.PhysioModeling.pkl')
+    model_path  = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.GS.PhysioModeling.pkl')
     model = sm.load(model_path)
     df.loc[(sbj,ses),'Varexp. by Physio'] = model.rsquared
     # Kappa and Rho
-    kr_path = osp.join(PRCS_DATA_DIR,sbj,f'D02_Preproc_fMRI_{ses}',f'{sbj}_{ses}_GS_kappa_and_rho.txt')
+    kr_path = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'{sbj}_{ses}_GS_kappa_and_rho.txt')
     kr      = pd.read_csv(kr_path)
     df.loc[(sbj,ses),'kappa'] = kr.loc[0,'kappa']
     df.loc[(sbj,ses),'rho'] = kr.loc[0,'rho']
     # Motion
-    mot_path = osp.join(PRCS_DATA_DIR,sbj,f'D04_Preproc_fMRI_{ses}_NORDIC',f'motion_{sbj}_enorm.1D')
+    mot_path = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'motion_{sbj}_enorm.1D')
     aux_mot = np.loadtxt(mot_path)
     df.loc[(sbj,ses),'Mean Motion (enorm)'] = aux_mot.mean()
     df.loc[(sbj,ses),'Max Motion (enorm)'] = aux_mot.max()

@@ -22,14 +22,11 @@ from bokeh.io import output_notebook
 from bokeh.resources import INLINE
 output_notebook(INLINE)
 
-#import os
-#port_tunnel = int(os.environ['PORT2'])
-#print('++ INFO: Second Port available: %d' % port_tunnel)
-port_tunnel = 45719
+import os
+port_tunnel = int(os.environ['PORT2'])
+print('++ INFO: Second Port available: %d' % port_tunnel)
+#port_tunnel = 45719
 
-# +
-from utils.basics import TES_MSEC
-from utils.basics import ATLASES_DIR, PRCS_DATA_DIR
 import os.path as osp
 import pandas as pd
 import xarray as xr
@@ -38,13 +35,13 @@ from tqdm import tqdm
 import pickle
 import panel as pn
 from nilearn.connectome import sym_matrix_to_vec
+
 from utils.basics import compute_residuals, echo_pairs, pairs_of_echo_pairs, echo_pairs_tuples, get_dataset_index
+from utils.basics import TES_MSEC
+from utils.basics import ATLASES_DIR, PRCS_DATA_DIR
+from utils.basics import mse_dist, chord_distance_between_intersecting_lines
 from utils.dashboard import fc_across_echoes_scatter_page, get_fc_matrices, get_static_report, get_fc_matrix,dynamic_summary_plot_gated
 
-from utils.basics import mse_dist, chord_distance_between_intersecting_lines
-
-
-# -
 
 def reject_outliers(data, m = 2.):
     d = np.abs(data - np.median(data))
@@ -262,10 +259,39 @@ QC_metrics['C',qc_metric].head(5)
 # ***
 # # 6. Tedana derived metrics
 
+# + active=""
 # %%time
-other_stats = pd.DataFrame(columns=['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic','Value'])
-other_stats = other_stats.set_index(['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic'])
-for sbj in tqdm(sbj_list, desc='Subjects'):
+# other_stats = pd.DataFrame(columns=['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic','Value'])
+# other_stats = other_stats.set_index(['Subject','Session','NORDIC','Tedana Type','Component Type','Statistic'])
+# for sbj in tqdm(sbj_list, desc='Subjects'):
+#     for ses in ses_list:
+#         partial_key = (sbj, ses)
+#         sbj_ses_in_fc = any(key[:len(partial_key)] == partial_key for key in data_fc)
+#         if not sbj_ses_in_fc:
+#             print('++ WARNING: This combination of sbj,ses [%s,%s] is not available. XR will contain np.nan.' % (sbj,ses))
+#             continue
+#         for nordic in nordic_opts.values():
+#             d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
+#             for tedana_type in ['fastica', 'fastica-mdl','robustica']:#,'robustica']:
+#                 ica_metrics_path         = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'tedana_{tedana_type}','ica_metrics.tsv')
+#                 ica_metrics              = pd.read_csv(ica_metrics_path, sep='\t').set_index('Component')
+#                 likely_bold_components   = list(ica_metrics[ica_metrics['classification_tags']=='Likely BOLD'].index)
+#                 unlikely_bold_components = list(ica_metrics[ica_metrics['classification_tags']=='Unlikely BOLD'].index)
+#
+#                 other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','Summed Variance']   = ica_metrics.loc[likely_bold_components,'variance explained'].sum().round(2)
+#                 other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','Summed Variance'] = ica_metrics.loc[unlikely_bold_components,'variance explained'].sum().round(2)
+#                 other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','#ICs']              = len(likely_bold_components)
+#                 other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','#ICs']            = len(unlikely_bold_components)
+#                 other_stats.loc[sbj,ses,nordic,tedana_type,'All Components','#ICs']           = ica_metrics.shape[0]
+
+# +
+# %%time
+for tedana_metric in ['#ICs (All)','#ICs (Likely BOLD)','#ICs (Unlikely BOLD)','Var. Exp. (Likely BOLD)','Var. Exp. (Unlikely BOLD)']:
+    aux_df = pd.DataFrame(columns=['Subject','Session','Pre-processing','NORDIC',tedana_metric])
+    aux_df.set_index(['Subject','Session','Pre-processing','NORDIC'], inplace=True)
+    QC_metrics['C',tedana_metric] = aux_df
+    
+for sbj in tqdm(sbj_list):
     for ses in ses_list:
         partial_key = (sbj, ses)
         sbj_ses_in_fc = any(key[:len(partial_key)] == partial_key for key in data_fc)
@@ -273,17 +299,31 @@ for sbj in tqdm(sbj_list, desc='Subjects'):
             print('++ WARNING: This combination of sbj,ses [%s,%s] is not available. XR will contain np.nan.' % (sbj,ses))
             continue
         for nordic in nordic_opts.values():
-            d_folder = f'D03_Preproc_{ses}_NORDIC-{nordic}'
-            for tedana_type in ['fastica']:#,'robustica']:
-                ica_metrics_path         = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'tedana_{tedana_type}','ica_metrics.tsv')
-                ica_metrics              = pd.read_csv(ica_metrics_path, sep='\t').set_index('Component')
-                likely_bold_components   = list(ica_metrics[ica_metrics['classification_tags']=='Likely BOLD'].index)
-                unlikely_bold_components = list(ica_metrics[ica_metrics['classification_tags']=='Unlikely BOLD'].index)
+            for pp in pp_opts.values():
+                if 'Tedana' not in pp:
+                    QC_metrics['C','#ICs (All)'].loc[sbj,ses,pp,nordic]                = np.nan
+                    QC_metrics['C','#ICs (Likely BOLD)'].loc[sbj,ses,pp,nordic]        = np.nan
+                    QC_metrics['C','#ICs (Unlikely BOLD)'].loc[sbj,ses,pp,nordic]      = np.nan
+                    QC_metrics['C','Var. Exp. (Likely BOLD)'].loc[sbj,ses,pp,nordic]   = np.nan
+                    QC_metrics['C','Var. Exp. (Unlikely BOLD)'].loc[sbj,ses,pp,nordic] = np.nan
+                else:
+                    tedana_type = pp.split('ALL_Tedana-')[1]
+                    d_folder    = f'D03_Preproc_{ses}_NORDIC-{nordic}'
+                    ica_metrics_path = osp.join(PRCS_DATA_DIR,sbj,d_folder,f'tedana_{tedana_type}','ica_metrics.tsv')
+                    ica_metrics              = pd.read_csv(ica_metrics_path, sep='\t').set_index('Component')
+                    likely_bold_components   = list(ica_metrics[ica_metrics['classification_tags']=='Likely BOLD'].index)
+                    unlikely_bold_components = list(ica_metrics[ica_metrics['classification_tags']=='Unlikely BOLD'].index)
+                    
+                    QC_metrics['C','#ICs (All)'].loc[sbj,ses,pp,nordic]              = ica_metrics.shape[0]
+                    QC_metrics['C','#ICs (Likely BOLD)'].loc[sbj,ses,pp,nordic]      = len(likely_bold_components)
+                    QC_metrics['C','#ICs (Unlikely BOLD)'].loc[sbj,ses,pp,nordic]    = len(unlikely_bold_components)
+                    QC_metrics['C','Var. Exp. (Likely BOLD)'].loc[sbj,ses,pp,nordic] = ica_metrics.loc[likely_bold_components,'variance explained'].sum().round(2)
+                    QC_metrics['C','Var. Exp. (Unlikely BOLD)'].loc[sbj,ses,pp,nordic] = ica_metrics.loc[unlikely_bold_components,'variance explained'].sum().round(2)
+# -
 
-                other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','Summed Variance']   = ica_metrics.loc[likely_bold_components,'variance explained'].sum().round(2)
-                other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','Summed Variance'] = ica_metrics.loc[unlikely_bold_components,'variance explained'].sum().round(2)
-                other_stats.loc[sbj,ses,nordic,tedana_type,'Likely BOLD','#ICs']              = len(likely_bold_components)
-                other_stats.loc[sbj,ses,nordic,tedana_type,'Unlikely BOLD','#ICs']            = len(unlikely_bold_components)
+for tedana_metric in ['#ICs (All)','#ICs (Likely BOLD)','#ICs (Unlikely BOLD)','Var. Exp. (Likely BOLD)','Var. Exp. (Unlikely BOLD)']:
+    QC_metrics['C',tedana_metric] = QC_metrics['C',tedana_metric].reset_index()
+    QC_metrics['R',tedana_metric] = QC_metrics['C',tedana_metric].copy()
 
 # ***
 #
@@ -328,10 +368,15 @@ sidebar = [sbj_select,ses_select,pp_select,nordic_select,fc_select, pn.layout.Di
 @pn.depends(sbj_select,ses_select, pp_select, nordic_select, fc_select, plot_select, show_line_fit_checkbox, scat_lim_input,show_stats_toggle,stat_test_select,annot_type_select,pps_to_include_in_group_results,remove_outliers_from_swarm_plots_toggle, qc_metric_select,show_points_toggle)
 def get_main_frame(sbj,ses, pp, nordic, fc_metric, plot_type, show_line_fit, ax_lim,show_stats,stat_test,annot_type,pps_to_include_in_barplot,remove_outliers_from_swarm_plots, qc_metric,show_points):
     if plot_type == 'hexbin':
-        frame = fc_across_echoes_scatter_page(DATASET,data_fc,pBOLD_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=True)
+        frame = fc_across_echoes_scatter_page(DATASET,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, 
+                                              data_fc,pBOLD_xr,QC_metrics,
+                                              show_line=show_line_fit, ax_lim=ax_lim, hexbin=True)
         return frame
     if plot_type == 'scatter':
-        frame = fc_across_echoes_scatter_page(DATASET,data_fc,pBOLD_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, other_stats=other_stats.loc[sbj,ses,nordic,:,:,:], hexbin=False)
+        frame = fc_across_echoes_scatter_page(DATASET,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, 
+                                              data_fc,pBOLD_xr,QC_metrics,
+                                              show_line=show_line_fit, ax_lim=ax_lim, hexbin=False)
+        #frame = fc_across_echoes_scatter_page(DATASET,data_fc,pBOLD_xr,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=show_line_fit, ax_lim=ax_lim, hexbin=False)
         return frame
     if plot_type == 'FCmats':
         fcR = get_fc_matrices(data_fc,pBOLD_xr,sbj,ses, nordic, 'R', net_cmap=power264_nw_cmap)
@@ -373,300 +418,155 @@ dashboard.stop()
 # ***
 
 import holoviews as hv
+def gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_linear_fit=False, ax_lim=None, hexbin=False, title=None):
+    """
+    Generate scatter plot for two different FC matrices
 
-sbj = 'MGSBJ03'
-ses = 'cardiac_gated'
-pp  = 'ALL_GS'
-nordic='off'
-eep1,eep2 = 'e01|e01','e01|e02'
-fc_metric= 'C'
+    Inputs:
+    -------
+    dataset (str): name of the dataset being used (e.g., evaluation, discovery)
+    data_fc (dict): dictionary with FC matrices
+    sbj (str): subject ID
+    ses (str): session ID
+    pp (str): pre-processing pipeline
+    nordic (str): whether Nordic was used or not
+    eep1 (str): first echo pair in the format 'e02|e02'
+    eep2 (str): second echo pair in the format 'e02|e02'
+    fc_metric (str): FC metric to be used ('R' for correlation, 'C' for covariance)
+    show_linear_fit (bool): whether to show linear fit line or not
+    ax_lim (float): axis limits for the scatter plot
+    hexbin (bool): whether to use hexbin plot instead of scatter plot
 
-data_df = pd.DataFrame(columns=[eep1,eep2])
-data_df[eep1] = sym_matrix_to_vec(data_fc[sbj,ses,pp,nordic,eep1,fc_metric].values, discard_diagonal=True)
-data_df[eep2] = sym_matrix_to_vec(data_fc[sbj,ses,pp,nordic,eep2,fc_metric].values, discard_diagonal=True)
+    Returns:
+    --------
+    hvplot object with the scatter plot and theoretical lines
 
-# +
-So_line_sl, So_line_int = 1.,0. # This is always the same
-BOLD_line_int = 0.              # This is always the same
-if fc_metric  == 'R':
-    BOLD_line_sl = 1.
-if fc_metric == 'C':
-    e1_X,e2_X     = eep1.split('|')
-    e1_Y,e2_Y     = eep2.split('|')
-    BOLD_line_sl  = (echo_times_dict[e1_Y]*echo_times_dict[e2_Y])/(echo_times_dict[e1_X]*echo_times_dict[e2_X])
+    """
+    echo_times_dict = TES_MSEC[dataset]
 
-BOLD_line = hv.Slope(BOLD_line_sl,BOLD_line_int).opts(line_color='g',line_width=1)
-So_line   = hv.Slope(So_line_sl,So_line_int).opts(line_color='r',line_width=1)
-zero_x    = hv.HLine(0).opts(line_color='k',line_width=.5,line_dash='dashed')
-zero_y    = hv.VLine(0).opts(line_color='k',line_width=.5,line_dash='dashed')
-# -
-
-mse_stats = mse_dist(data_df.values,BOLD_line_sl,So_line_sl, weight_fn=lambda r: np.power(r,.5), max_weight_fn=lambda r: np.minimum(r,np.quantile(r,.95)), verbose_return=True)
-mse_stats
-
-data_df['w']     = mse_stats['w']
-data_df['dBOLD'] = mse_stats['d1']
-data_df['dSo']   = mse_stats['d2']
-print(data_df['w'].max())
-
-(data_df.hvplot.scatter(x=eep1,y=eep2, aspect='square',color='w', cmap='viridis',s=1, xlim=(-5,5),ylim=(-5,5)).opts(clim=(data_df['w'].min(),data_df['w'].max())) * BOLD_line * So_line * zero_x * zero_y) + \
-(data_df.hvplot.scatter(x=eep1,y=eep2, aspect='square',color='dBOLD', cmap='viridis',s=1, xlim=(-5,5),ylim=(-5,5)).opts(clim=(data_df['dBOLD'].quantile(0.05),data_df['dBOLD'].quantile(0.85))) * BOLD_line * So_line * zero_x * zero_y)
-
-(data_df.hvplot.scatter(x=eep1,y=eep2, aspect='square',color='w', cmap='viridis',s=1, xlim=(-5,5),ylim=(-5,5)).opts(clim=(data_df['w'].quantile(0.05),data_df['w'].quantile(0.85))) * BOLD_line * So_line * zero_x * zero_y) + \
-(data_df.hvplot.scatter(x=eep1,y=eep2, aspect='square',color='dBOLD', cmap='viridis',s=1, xlim=(-5,5),ylim=(-5,5)).opts(clim=(data_df['dBOLD'].quantile(0.05),data_df['dBOLD'].quantile(0.85))) * BOLD_line * So_line * zero_x * zero_y)
-
-
-def mse_dist(points,m1,m2,weight_fn=None, max_weight_fn=lambda r: np.minimum(r,np.quantile(r,.99)),tol = 1e-12, verbose_return=False):
-    x  = points[:,0]; y = points[:,1]
-    pd1 = compute_residuals(x,y,m1,0.0)
-    pd2 = compute_residuals(x,y,m2,0.0)
-    r  = np.sqrt(x**2 + y**2)
-    if weight_fn is None:
-        weight_fn = lambda r: r   # linear weight by radius
-    w = weight_fn(r)
-    if max_weight_fn is not None:
-        w = max_weight_fn(w)
-    total_weight = w.sum()
-    # Line 1
-    pref1 = (pd1 < pd2).astype(float)
-    ties = np.isclose(pd1, pd2, atol=tol)
-    pref1[ties] = 0.5
-    weighted_pref1 = (w * pref1).sum()
-    frac_line1 = weighted_pref1 / (total_weight + 1e-16)
-
-    # Line 2
-    pref2 = (pd1 > pd2).astype(float)
-    tol = 1e-12
-    ties = np.isclose(pd1, pd2, atol=tol)
-    pref2[ties] = 0.5
-    weighted_pref2 = (w * pref2).sum()
-    frac_line2 = weighted_pref2 / (total_weight + 1e-16)
-    if verbose_return:
-        return {'p_line1':frac_line1,
-            'p_line2':frac_line2,
-            'd1':pd1,
-            'd2':pd2,
-            'w':w,
-            'r':r}
+    if (sbj,ses,pp,nordic,eep1,fc_metric) not in data_fc:
+        return pn.pane.Markdown('#Not Available')
+    data_df = pd.DataFrame(columns=[eep1,eep2, fc_metric])
+    data_df[eep1] = sym_matrix_to_vec(data_fc[sbj,ses,pp,nordic,eep1,fc_metric].values, discard_diagonal=True)
+    data_df[eep2] = sym_matrix_to_vec(data_fc[sbj,ses,pp,nordic,eep2,fc_metric].values, discard_diagonal=True)
+    # Compute limits for X and Y axis
+    if ax_lim is None:
+        if fc_metric == 'R':
+            lims = (-1,1) 
+        else:
+            lims = (data_df.quantile(0.01).min(),data_df.quantile(0.99).max())
     else:
-        return frac_line1,frac_line2
+        lims=(-ax_lim,ax_lim)
+    # Create scatter plot and fitted line
+    scat           = data_df.hvplot.scatter(x=eep1, y=eep2, aspect='square',s=1, xlim=lims, ylim=lims, alpha=.7, title=title) #.opts(active_tools=['save'], tools=['save'])
+    data_lin_fit   = hv.Slope.from_scatter(scat).opts(line_width=3, line_color='#0f0fff') #.opts(active_tools=['save'], tools=['save'])
 
-
-# +
-def angdiff(a, b):
-    """Smallest signed angle difference a-b in [-pi, pi]."""
-    d = a - b
-    d = (d + np.pi) % (2*np.pi) - np.pi
-    return d
-
-def angdiff_line(theta, phi):
-    """
-    Smallest angle difference between a direction (theta)
-    and an *undirected line* with orientation phi.
-    Returns value in [0, pi/2].
-    """
-    # Wrap into [-pi, pi]
-    d = (theta - phi + np.pi) % (2*np.pi) - np.pi
-    # Fold over pi to remove direction
-    return np.minimum(np.abs(d), np.pi - np.abs(d))
-
-def ang_dist(points,m1,m2,weight_fn=None, max_weight=None,tol = 1e-12):
-    """
-    points: (N,2) array of (x,y)
-    m1, m2: slopes of the two lines through origin
-    weight_fn: function r -> weight (if None uses w = r)
-    returns: dict with weighted counts / fraction preferring line1
-    """
-    x = points[:,0]; y = points[:,1]
-    theta = np.arctan2(y, x)
-    r = np.sqrt(x**2 + y**2)
-    if weight_fn is None:
-        weight_fn = lambda r: r   # linear weight by radius
-    w = weight_fn(r)
-    if max_weight is not None:
-        w = np.minimum(max_weight,w)
-    total_weight = w.sum()
+    if hexbin:
+        scat = data_df.hvplot.hexbin(x=eep1, y=eep2, aspect='square',s=1, xlim=lims, ylim=lims, alpha=.7)
+    # Compute theoretical slopes for extreme BOLD and So dominated regimes
+    if fc_metric  == 'R':
+        BOLD_line_sl, BOLD_line_int = 1.,0.
+    else:
+        e1_X,e2_X     = eep1.split('|')
+        e1_Y,e2_Y     = eep2.split('|')
+        BOLD_line_sl  = (echo_times_dict[e1_Y]*echo_times_dict[e2_Y])/(echo_times_dict[e1_X]*echo_times_dict[e2_X])
+        BOLD_line_int = 0.
     
-    phi1 = np.arctan(m1)
-    phi2 = np.arctan(m2)
-    d1 = np.abs(angdiff(theta, phi1))
-    d2 = np.abs(angdiff(theta, phi2))
+    So_line_sl, So_line_int = 1.,0.
     
-    # Line 1
-    pref1 = (d1 < d2).astype(float)
-    ties = np.isclose(d1, d2, atol=tol)
-    pref1[ties] = 0.5
-    weighted_pref1 = (w * pref1).sum()
-    frac_line1 = weighted_pref1 / (total_weight + 1e-16)
-
-    # Line 1
-    pref2 = (d1 > d2).astype(float)
-    ties = np.isclose(d1, d2, atol=tol)
-    pref2[ties] = 0.5
-    weighted_pref2 = (w * pref2).sum()
-    frac_line2 = weighted_pref2 / (total_weight + 1e-16)
-    return {'p_line1':frac_line1,
-            'p_line2':frac_line2,
-            'd1':d1,
-            'd2':d2,
-            'w':w}
-
-
-# -
-
-(data_df.hvplot.scatter(x=eep1,y=eep2, aspect='square',color='w', cmap='viridis',s=1, xlim=(-5,5),ylim=(-5,5)).opts(clim=(data_df['w'].quantile(0.05),data_df['w'].quantile(0.85))) * BOLD_line * So_line * zero_x * zero_y) + \
-(data_df.hvplot.scatter(x=eep1,y=eep2, aspect='square',color='dBOLD', cmap='viridis',s=1, xlim=(-5,5),ylim=(-5,5)).opts(clim=(data_df['dBOLD'].quantile(0.01),data_df['dBOLD'].quantile(0.99))) * BOLD_line * So_line * zero_x * zero_y) + \
-(data_df.hvplot.scatter(x=eep1,y=eep2, aspect='square',color='dSo', cmap='viridis',s=1, xlim=(-5,5),ylim=(-5,5)).opts(clim=(data_df['dSo'].quantile(0.01),data_df['dSo'].quantile(0.99))) * BOLD_line * So_line * zero_x * zero_y) 
-
-data_df.hvplot.scatter(x='dBOLD',y='dSo', aspect='square',color='w', cmap='viridis',s=1)
-
-data_df.hvplot.scatter(x='wdBOLD',y='wdSo', aspect='square',color='w', cmap='viridis',s=1)
-
-points = data_df.values
-points[:,0].shape
-
-
-
-mse_dist(points,BOLD_line_sl,So_line_sl,weight_fn=lambda r: np.power(r,.5), max_weight=2.0)
-
-
-# +
-# Alternative metrics
-def angdiff(a, b):
-    """Smallest signed angle difference a-b in [-pi, pi]."""
-    d = a - b
-    d = (d + np.pi) % (2*np.pi) - np.pi
-    return d
-
-def weighted_line_preference(points, m1, m2, weight_fn=None):
-    """
-    points: (N,2) array of (x,y)
-    m1, m2: slopes of the two lines through origin
-    weight_fn: function r -> weight (if None uses w = r)
-    returns: dict with weighted counts / fraction preferring line1
-    """
-    x = points[:,0]; y = points[:,1]
-    theta = np.arctan2(y, x)
-    r = np.sqrt(x**2 + y**2)
-    if weight_fn is None:
-        weight_fn = lambda r: r   # linear weight by radius
-    w = weight_fn(r)
-    w = np.minimum(2.,w)
-    phi1 = np.arctan(m1)
-    phi2 = np.arctan(m2)
-    d1 = np.abs(angdiff(theta, phi1))
-    d2 = np.abs(angdiff(theta, phi2))
-    # prefer the line with smaller angular error
-    pref1 = (d1 < d2).astype(float)
-    # tie-breaker: if equal within tolerance, split 0.5
-    tol = 1e-12
-    ties = np.isclose(d1, d2, atol=tol)
-    pref1[ties] = 0.5
-    weighted_pref1 = (w * pref1).sum()
-    total_weight = w.sum()
-    frac_line1 = weighted_pref1 / (total_weight + 1e-16)
-    return {
-        'd1':d1,
-        'd2':d2,
-        'frac_line1': frac_line1,
-        'weighted_pref1': weighted_pref1,
-        'total_weight': total_weight,
-        'per_point_weights': w,
-        'per_point_pref1': pref1
-    }
-
-
-# -
-
-np.minimum(2.,out['per_point_weights'])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ***
-#
-# # Figures for OHBM poster
-
-import seaborn as sns
-import matplotlib.pyplot as plt
-from statannotations.Annotator import Annotator
-from itertools import combinations
-def get_barplot(qa_xr,nordic,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True):
-    """
-    Create Static Bar Graph for a given quality metric
-    """
-    df         = qa_xr.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
-    df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
-    df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
-    num_hues   = len(list(df[hue].unique()))
-    df_swarm = df.copy()
-    if remove_outliers_from_swarm:
-        quantile_value = df[qc_metric].quantile(.97)
-        df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
-
-    if (x=='Pre-processing') and (hue=='NORDIC'):
-        pairs  = [((p,'On'),(p,'Off')) for p in df[x].unique()]
-        colors = sns.color_palette("rocket",num_hues)
-    if (x=='NORDIC') and (hue=='Pre-processing'):
-        pairs      = [(('On',c[0]),('On',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
-        pairs      = pairs + [(('Off',c[0]),('Off',c[1])) for c in combinations(list(df['Pre-processing'].unique()),2)]
-        colors = sns.color_palette("Set2",num_hues)
-
-    sns.set_context("paper", rc={"xtick.labelsize": 16, "ytick.labelsize": 16, "axes.labelsize": 16, 'legend.fontsize':16})
-    fig, axs = plt.subplots(1,1,figsize=(6,6));
-    sns.despine(top=True, right=True)
-    sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
-    sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=.5, dodge=True, legend=False, palette=colors);
+    # Create Theoretical BOLD and So lines
+    BOLD_line  = hv.Slope(BOLD_line_sl, BOLD_line_int).opts(line_color='g',line_width=2, line_dash='dashed') #.opts(active_tools=['save'], tools=['save'])
+    So_line    = hv.Slope(So_line_sl,   So_line_int  ).opts(line_color='r',line_width=2, line_dash='dashed') #.opts(active_tools=['save'], tools=['save'])
     
-    if show_stats:
-        annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);
-        annotation.configure(test=stat_test, text_format=stat_annot_type, loc='inside', verbose=0);
-        annotation.apply_test(alternative='two-sided');
-        annotation.annotate();
-    sns.move_legend(axs, "lower center", bbox_to_anchor=(.5, 1), ncol=4, title=None, frameon=False,)
-    plt.tight_layout()
-    plt.close()
-    return fig
+    # Join all graphical elements
+    if show_linear_fit:
+        plot = (scat * data_lin_fit * So_line * BOLD_line) #.opts(toolbar=None)
+    else:
+        plot = (scat * So_line * BOLD_line)
+     
+    return plot.opts(active_tools=['reset'])
 
 
-a = get_barplot(qa_xr.sel(pp=['ALL_Basic','ALL_GSasis','ALL_Tedana']),'Off','C','pBOLD',hue='Pre-processing',x='NORDIC',stat_test='t-test_paired', show_stats=True, stat_annot_type='star', legend_location='lower left', )
+def fc_across_echoes_scatter_page(dataset,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, 
+                                  data_fc,data_scat,data_qc,
+                                  show_line=False, ax_lim=None, hexbin=False):
+    """
+    Create panel Frame with scatter plots for all FC combinations and table with QC metrics
 
-a
+    Inputs:
+    -------
+    dataset (str): name of the dataset being used (e.g., evaluation, discovery)
+    data_fc (dict): dictionary with FC matrices
+    data_scat (xarray.DataArray): xarray object with quality metrics
+    sbj (str): subject ID
+    ses (str): session ID
+    pp (str): pre-processing pipeline
+    nordic (str): whether Nordic was used or not
+    fc_metric (str): FC metric to be used ('R' for correlation, 'C' for covariance)
+    pairs_of_echo_pairs (list): list of echo pair combinations in the format ['e02|e02_vs_e03|e03', ...]
+    show_line (bool): whether to show linear fit line or not
+    ax_lim (float): axis limits for the scatter plot
+    other_stats (pd.DataFrame or None): additional statistics to be displayed in the table
+    hexbin (bool): whether to use hexbin plot instead of scatter plot
 
-a.savefig('./saved_images/pBOLD_evaluation_group_result.eps')
+    Returns:
+    --------
+    pn.Row: Panel layout containing the scatter plots and statistics table
+    """
 
-a = get_barplot(qa_xr.sel(pp=['ALL_Basic','ALL_GSasis','ALL_Tedana']),'Off','C','TSNR (Full Brain)',hue='Pre-processing',x='NORDIC',stat_test='t-test_paired', show_stats=True, stat_annot_type='star', legend_location='lower left', )
-a
+    # Grid of scatter plots
+    # =====================
+    scatter_layout = pn.layout.GridBox(ncols=5)
+    for i in pairs_of_echo_pairs:
+        eep1,eep2=i.split('_vs_')
+        this_scatter_pBOLD = data_scat.sel(sbj=sbj,ses=ses,fc_metric=fc_metric,ee_vs_ee=i,nordic=nordic,pp=pp,qc_metric='pBOLD').values
+        this_scatter_pSo   = data_scat.sel(sbj=sbj,ses=ses,fc_metric=fc_metric,ee_vs_ee=i,nordic=nordic,pp=pp,qc_metric='pSo').values
+        #this_scatter_TSNR  = data_qc[fc_metric,'TSNR (Full Brain)'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+        title = 'pBOLD=%.2f | pSo=%.2f' % (this_scatter_pBOLD, this_scatter_pSo)
+        plot = gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_line, ax_lim, hexbin=hexbin, title=title)
+        scatter_layout.append(plot)
 
-a.savefig('./saved_images/TSNR_evaluation_group_result.eps')
+    # Statistics Table
+    # ================
+    stats_df      = data_scat.loc[sbj,ses,pp,nordic,fc_metric,:,:].to_dataframe(name='QC').reset_index().drop(['sbj','ses','pp','fc_metric'],axis=1).pivot(index='ee_vs_ee', columns='qc_metric', values='QC')
+    stats_mean_df = pd.DataFrame(stats_df.mean(),columns=['Avg']).T
+    stats_mean_df.loc['Weighted Avg','pBOLD'] = data_qc[fc_metric,'pBOLD'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+    stats_mean_df.loc['Weighted Avg','pSo']   = data_qc[fc_metric,'pSo'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+    pBOLD_card    = pn.Card(pn.Column(pn.pane.DataFrame(stats_df.round(2)), pn.layout.Divider(), pn.pane.DataFrame(stats_mean_df.round(2))), title='QC Metrics', width=350)
 
-a = get_barplot(qa_xr.sel(pp=['ALL_Basic','ALL_GSasis','ALL_Tedana','ALL_Tedana-NORDIC_FixNComps']),'On','C','TSNR (Full Brain)',x='Pre-processing',hue='NORDIC',stat_test='t-test_paired', show_stats=True, stat_annot_type='star', legend_location='lower left', )
+    TSNR_df                         = pd.DataFrame(columns=['Full Brain','Visual Cortex'],index=[pp])
+    TSNR_df.loc[pp,'Full Brain']    = data_qc[fc_metric,'TSNR (Full Brain)'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+    TSNR_df.loc[pp,'Visual Cortex'] = data_qc[fc_metric,'TSNR (Visual Cortex)'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+    TSNR_plot                       = QC_metrics[fc_metric,'TSNR (Full Brain)'].set_index(['Subject','Session','NORDIC','Pre-processing']).loc[sbj,ses,nordic,:].reset_index().replace({'ALL_Basic':'Basic',
+                                                                                                                                                                                  'ALL_GS':'GS',
+                                                                                                                                                                                  'ALL_Tedana-fastica':'fastica',
+                                                                                                                                                                                  'ALL_Tedana-fastica-mdl':'f-mdl',
+                                                                                                                                                                                  'ALL_Tedana-robustica':'robustica'}).hvplot.bar(x='Pre-processing',y='TSNR (Full Brain)', width=300).opts(xrotation=90, toolbar=None)
+    TSNR_card                       = pn.Card(pn.Column(TSNR_df, TSNR_plot), title='TSNR', width=350)
+
+    # Tedana Card
+    # ===========
+    tedana_df = pd.concat([QC_metrics['C','#ICs (All)'].set_index(['Subject','Session','NORDIC','Pre-processing']).loc[sbj,ses,nordic,:].reset_index().replace({'ALL_Basic':'Basic','ALL_GS':'GS','ALL_Tedana-fastica':'fastica','ALL_Tedana-fastica-mdl':'f-mdl','ALL_Tedana-robustica':'robustica'}).set_index('Pre-processing'),
+           QC_metrics['C','#ICs (Likely BOLD)'].set_index(['Subject','Session','NORDIC','Pre-processing']).loc[sbj,ses,nordic,:].reset_index().replace({'ALL_Basic':'Basic','ALL_GS':'GS','ALL_Tedana-fastica':'fastica','ALL_Tedana-fastica-mdl':'f-mdl','ALL_Tedana-robustica':'robustica'}).set_index('Pre-processing'),
+           QC_metrics['C','#ICs (Unlikely BOLD)'].set_index(['Subject','Session','NORDIC','Pre-processing']).loc[sbj,ses,nordic,:].reset_index().replace({'ALL_Basic':'Basic','ALL_GS':'GS','ALL_Tedana-fastica':'fastica','ALL_Tedana-fastica-mdl':'f-mdl','ALL_Tedana-robustica':'robustica'}).set_index('Pre-processing')],
+           axis=1).drop(['Basic','GS'])
+    tedana_df.columns = ['All','BOLD','unl BOLD']
+    tedana_df.hvplot.bar(x='Pre-processing', width=300).opts(xrotation=90, toolbar=None)
+    tedana_card                       = pn.Card(pn.Column(tedana_df), title='Tedana Components', width=350)
+
+    tables = pn.Column(pBOLD_card, TSNR_card, tedana_card)
+    #if other_stats is None:
+    #    tables = pn.Column(pBOLD_card, pn.layout.Divider(), TSNR_card)
+    #else:
+    #    tables = pn.Column(pBOLD_card, pn.layout.Divider(), TSNR_card, pn.layout.Divider(),  pn.pane.DataFrame(other_stats))
+
+    # Create Page
+    frame = pn.Row(scatter_layout, tables)
+    return frame
 
 
-a
+fc_across_echoes_scatter_page('discovery','MGSBJ01','constant_gated','ALL_Tedana-fastica-mdl','off','C',pairs_of_echo_pairs,data_fc,pBOLD_xr,QC_metrics)
 
-fc_metric, qc_metric = 'C','TSNR (Full Brain)'
-df         = qa_xr.mean(dim='ee_vs_ee').sel(fc_metric=fc_metric, qc_metric=qc_metric).to_dataframe(name=qc_metric).drop(['fc_metric','qc_metric'],axis=1).reset_index()
-df.columns = ['Subject','Session','Pre-processing','NORDIC',qc_metric]
-df         = df.replace({'ALL_Basic':'Basic','ALL_GSasis':'GSR','ALL_Tedana':'Tedana','ALL_Tedana-NORDIC_FixNComps':'Tedana (n=88)', 'NORDIC':'On'})
-
-df['TSNR (Full Brain)'].replace() df['TSNR (Full Brain)'].quantile(.97)
-
-quantile_value = df['TSNR (Full Brain)'].quantile(.97)
-df['TSNR (Full Brain)'] = df['TSNR (Full Brain)'].where(df['TSNR (Full Brain)'] <= quantile_value, quantile_value)
-
+pairs_of_echo_pairs
 
 

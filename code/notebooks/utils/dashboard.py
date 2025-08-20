@@ -16,7 +16,7 @@ from .basics import TES_MSEC, echo_pairs
 
 # Scatter Plot related functions
 # ==============================
-def gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_linear_fit=False, ax_lim=None, hexbin=False):
+def gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_linear_fit=False, ax_lim=None, hexbin=False, title=None):
     """
     Generate scatter plot for two different FC matrices
 
@@ -56,7 +56,7 @@ def gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_line
     else:
         lims=(-ax_lim,ax_lim)
     # Create scatter plot and fitted line
-    scat           = data_df.hvplot.scatter(x=eep1, y=eep2, aspect='square',s=1, xlim=lims, ylim=lims, alpha=.7) #.opts(active_tools=['save'], tools=['save'])
+    scat           = data_df.hvplot.scatter(x=eep1, y=eep2, aspect='square',s=1, xlim=lims, ylim=lims, alpha=.7, title=title) #.opts(active_tools=['save'], tools=['save'])
     data_lin_fit   = hv.Slope.from_scatter(scat).opts(line_width=3, line_color='#0f0fff') #.opts(active_tools=['save'], tools=['save'])
 
     if hexbin:
@@ -82,17 +82,19 @@ def gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_line
     else:
         plot = (scat * So_line * BOLD_line)
      
-    return plot
+    return plot.opts(active_tools=['reset'])
 
-def fc_across_echoes_scatter_page(dataset,fc_data,qa_data,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, show_line=False, ax_lim=None, other_stats=None, hexbin=False):
+def fc_across_echoes_scatter_page(dataset,sbj,ses,pp, nordic,fc_metric, pairs_of_echo_pairs, 
+                                  data_fc,data_scat,data_qc,
+                                  show_line=False, ax_lim=None, hexbin=False):
     """
     Create panel Frame with scatter plots for all FC combinations and table with QC metrics
 
     Inputs:
     -------
     dataset (str): name of the dataset being used (e.g., evaluation, discovery)
-    fc_data (dict): dictionary with FC matrices
-    qa_data (xarray.DataArray): xarray object with quality metrics
+    data_fc (dict): dictionary with FC matrices
+    data_scat (xarray.DataArray): xarray object with quality metrics
     sbj (str): subject ID
     ses (str): session ID
     pp (str): pre-processing pipeline
@@ -110,23 +112,52 @@ def fc_across_echoes_scatter_page(dataset,fc_data,qa_data,sbj,ses,pp, nordic,fc_
     """
 
     # Grid of scatter plots
+    # =====================
     scatter_layout = pn.layout.GridBox(ncols=5)
     for i in pairs_of_echo_pairs:
         eep1,eep2=i.split('_vs_')
-        plot = gen_scatter(dataset,fc_data,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_line, ax_lim, hexbin=hexbin)
+        this_scatter_pBOLD = data_scat.sel(sbj=sbj,ses=ses,fc_metric=fc_metric,ee_vs_ee=i,nordic=nordic,pp=pp,qc_metric='pBOLD').values
+        this_scatter_pSo   = data_scat.sel(sbj=sbj,ses=ses,fc_metric=fc_metric,ee_vs_ee=i,nordic=nordic,pp=pp,qc_metric='pSo').values
+        #this_scatter_TSNR  = data_qc[fc_metric,'TSNR (Full Brain)'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+        title = 'pBOLD=%.2f | pSo=%.2f' % (this_scatter_pBOLD, this_scatter_pSo)
+        plot = gen_scatter(dataset,data_fc,sbj,ses,pp,nordic,eep1,eep2,fc_metric, show_line, ax_lim, hexbin=hexbin, title=title)
         scatter_layout.append(plot)
 
-    # Statistics Table 
-    stats_df      = qa_data.loc[sbj,ses,pp,nordic,fc_metric,:,:].to_dataframe(name='QC').reset_index().drop(['sbj','ses','pp','fc_metric'],axis=1).pivot(index='ee_vs_ee', columns='qc_metric', values='QC')
+    # Statistics Table
+    # ================
+    stats_df      = data_scat.loc[sbj,ses,pp,nordic,fc_metric,:,:].to_dataframe(name='QC').reset_index().drop(['sbj','ses','pp','fc_metric'],axis=1).pivot(index='ee_vs_ee', columns='qc_metric', values='QC')
     stats_mean_df = pd.DataFrame(stats_df.mean(),columns=['Avg']).T
-    if other_stats is None:
-        tables = pn.Column(pn.pane.DataFrame(stats_df.round(2)), pn.layout.Divider(), pn.pane.DataFrame(stats_mean_df.round(2))   )
-    else:
-        tables = pn.Column(pn.pane.DataFrame(stats_df.round(2)), pn.layout.Divider(), pn.pane.DataFrame(stats_mean_df.round(2)), pn.layout.Divider(),  pn.pane.DataFrame(other_stats))
+    stats_mean_df.loc['Weighted Avg','pBOLD'] = data_qc[fc_metric,'pBOLD'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+    stats_mean_df.loc['Weighted Avg','pSo']   = data_qc[fc_metric,'pSo'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+    pBOLD_card    = pn.Card(pn.Column(pn.pane.DataFrame(stats_df.round(2)), pn.layout.Divider(), pn.pane.DataFrame(stats_mean_df.round(2))), title='QC Metrics', width=350)
 
+    TSNR_df                         = pd.DataFrame(columns=['Full Brain','Visual Cortex'],index=[pp])
+    TSNR_df.loc[pp,'Full Brain']    = data_qc[fc_metric,'TSNR (Full Brain)'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+    TSNR_df.loc[pp,'Visual Cortex'] = data_qc[fc_metric,'TSNR (Visual Cortex)'].set_index(['Subject','Session','Pre-processing','NORDIC']).loc[sbj,ses,pp,nordic].values[0]
+    TSNR_plot                       = data_qc[fc_metric,'TSNR (Full Brain)'].set_index(['Subject','Session','NORDIC','Pre-processing']).loc[sbj,ses,nordic,:].reset_index().replace({'ALL_Basic':'Basic',
+                                                                                                                                                                                  'ALL_GS':'GS',
+                                                                                                                                                                                  'ALL_Tedana-fastica':'fastica',
+                                                                                                                                                                                  'ALL_Tedana-fastica-mdl':'f-mdl',
+                                                                                                                                                                                  'ALL_Tedana-robustica':'robustica'}).hvplot.bar(x='Pre-processing',y='TSNR (Full Brain)', width=300).opts(xrotation=90, toolbar=None)
+    TSNR_card                       = pn.Card(pn.Column(TSNR_df, TSNR_plot), title='TSNR', width=350)
+
+    # Tedana Card
+    # ===========
+    tedana_df = pd.concat([data_qc['C','#ICs (All)'].set_index(['Subject','Session','NORDIC','Pre-processing']).loc[sbj,ses,nordic,:].reset_index().replace({'ALL_Basic':'Basic','ALL_GS':'GS','ALL_Tedana-fastica':'fastica','ALL_Tedana-fastica-mdl':'f-mdl','ALL_Tedana-robustica':'robustica'}).set_index('Pre-processing'),
+                           data_qc['C','#ICs (Likely BOLD)'].set_index(['Subject','Session','NORDIC','Pre-processing']).loc[sbj,ses,nordic,:].reset_index().replace({'ALL_Basic':'Basic','ALL_GS':'GS','ALL_Tedana-fastica':'fastica','ALL_Tedana-fastica-mdl':'f-mdl','ALL_Tedana-robustica':'robustica'}).set_index('Pre-processing'),
+                           data_qc['C','#ICs (Unlikely BOLD)'].set_index(['Subject','Session','NORDIC','Pre-processing']).loc[sbj,ses,nordic,:].reset_index().replace({'ALL_Basic':'Basic','ALL_GS':'GS','ALL_Tedana-fastica':'fastica','ALL_Tedana-fastica-mdl':'f-mdl','ALL_Tedana-robustica':'robustica'}).set_index('Pre-processing')],
+                           axis=1).drop(['Basic','GS'])
+    tedana_df.columns = ['All','BOLD','unl BOLD']
+    tedana_plot = tedana_df.hvplot.bar(x='Pre-processing', width=300).opts(xrotation=90, toolbar=None)
+    tedana_card                       = pn.Card(pn.Column(tedana_df, tedana_plot), title='Tedana Components', width=350)
+
+    tables = pn.Column(pBOLD_card, TSNR_card, tedana_card)
+    
     # Create Page
+    # ===========
     frame = pn.Row(scatter_layout, tables)
     return frame
+    
     
 
 # FC Matrix Plotting functions

@@ -100,18 +100,18 @@ for EC in e01 e02 e03
 do
   echo " + Denoising echo [${EC} | ALL]"
    3dTproject -overwrite                                                                    \
-               -polort -1                                                                   \
+               -polort 0                                                                    \
                -input pb03.${SBJ}.r01.${EC}.volreg+tlrc                                     \
                -ort X.nocensor.xmat.${EC}.1D                                                \
                -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Basic                     \
                -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
 
     3dcalc -overwrite -a rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Basic+tlrc -expr 'b+a'         -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Basic
-    3dcalc -overwrite -a rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Basic+tlrc -expr '100*b/a' -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_ALL_Basic
+    3dcalc -overwrite -a rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Basic+tlrc -expr '100*(b-a)/a' -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_ALL_Basic
     
     echo " + Denoising echo [${EC} | ALL] | GS"
     3dTproject -overwrite                                                                   \
-               -polort -1                                                                   \
+               -polort 0                                                                    \
                -input pb03.${SBJ}.r01.${EC}.volreg+tlrc                                     \
                -ort X.nocensor.xmat.${EC}.1D                                                \
                -ort pb03.${SBJ}.r01.${EC}.volreg.GS.demean.1D                               \
@@ -119,7 +119,7 @@ do
                -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
     
    3dcalc -overwrite -a rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_GS+tlrc -expr 'b+a' -prefix         errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_GS
-   3dcalc -overwrite -a rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_GS+tlrc -expr '100*b/a' -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_ALL_GS
+   3dcalc -overwrite -a rm.mean_pb03.${SBJ}.r01.${EC}.volreg+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_GS+tlrc -expr '100*(b-a)/a' -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_ALL_GS
 done
 
 # Extract ROI Timeseries

@@ -36,10 +36,21 @@ echo "============================================================"
 3drefit -space MNI tedana_${TEDANA_TYPE}/dn_ts_e1.nii.gz
 3drefit -space MNI tedana_${TEDANA_TYPE}/dn_ts_e2.nii.gz
 3drefit -space MNI tedana_${TEDANA_TYPE}/dn_ts_e3.nii.gz
+3drefit -space MNI tedana_${TEDANA_TYPE}/ts_OC.nii.gz
 
 3dcalc -overwrite -b tedana_${TEDANA_TYPE}/dn_ts_e1.nii.gz -expr b -datum float -prefix pb06.${SBJ}.r01.e01.tedana_${TEDANA_TYPE}_dn
 3dcalc -overwrite -b tedana_${TEDANA_TYPE}/dn_ts_e2.nii.gz -expr b -datum float -prefix pb06.${SBJ}.r01.e02.tedana_${TEDANA_TYPE}_dn
 3dcalc -overwrite -b tedana_${TEDANA_TYPE}/dn_ts_e3.nii.gz -expr b -datum float -prefix pb06.${SBJ}.r01.e03.tedana_${TEDANA_TYPE}_dn
+3dcalc -overwrite -b tedana_${TEDANA_TYPE}/ts_OC.nii.gz    -expr b -datum float -prefix pb06.${SBJ}.r01.tedana_${TEDANA_TYPE}_OC
+
+echo "++ Extract global signal from OC timeseries"
+echo "==========================================="
+# Global regression with no detrending prior to computing GS
+    3dROIstats -quiet \
+               -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz \
+                pb06.${SBJ}.r01.tedana_${TEDANA_TYPE}_OC+tlrc.HEAD | awk '{print $1}' > pb06.${SBJ}.r01.tedana_${TEDANA_TYPE}_OC.GS.1D
+    1d_tool.py -overwrite -infile pb06.${SBJ}.r01.tedana_${TEDANA_TYPE}_OC.GS.1D -demean -write pb06.${SBJ}.r01.tedana_${TEDANA_TYPE}_OC.GS.demean.1D 
+
 
 echo "++ Scaling volreg versions of each echo:"
 echo "========================================"
@@ -55,13 +66,13 @@ for EC in e01 e02 e03
 do
    echo " + Denoising echo [${EC} | ALL]"
    3dTproject -overwrite                                                                      \
-               -polort -1                                                                     \
+               -polort 0                                                                      \
                -input pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc                     \
                -ort X.nocensor.xmat.${EC}.1D                                                  \
                -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Tedana-${TEDANA_TYPE}       \
                -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
    3dcalc -overwrite -a rm.mean_pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Tedana-${TEDANA_TYPE}+tlrc -expr 'a+b'     -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Tedana-${TEDANA_TYPE}
-   3dcalc -overwrite -a rm.mean_pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Tedana-${TEDANA_TYPE}+tlrc -expr '100*b/a' -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_ALL_Tedana-${TEDANA_TYPE}
+   3dcalc -overwrite -a rm.mean_pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Tedana-${TEDANA_TYPE}+tlrc -expr '100*(b-a)/a' -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_ALL_Tedana-${TEDANA_TYPE}
 done
 
 echo "++ Computing Full Brain TSNR for Basic and GSasis"

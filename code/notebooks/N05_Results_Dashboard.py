@@ -99,9 +99,9 @@ power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0]
 # +
 pp_opts = {'No Censoring | Basic':'ALL_Basic',
            'No Censoring | GSR':'ALL_GS',
-           'No Censoring | Tedana (fastica)':'ALL_Tedana-fastica', 
-           'No Censoring | Tedana (fastica MDL)':'ALL_Tedana-fastica-mdl',
-           'No Censoring | Tedana (robustica)':'ALL_Tedana-robustica'}
+           'No Censoring | Tedana (fastica)':'ALL_Tedana-fastica'} #, 
+           #'No Censoring | Tedana (fastica MDL)':'ALL_Tedana-fastica-mdl',
+           #'No Censoring | Tedana (robustica)':'ALL_Tedana-robustica'}
 nordic_opts = {'Do not use':'off', 'Active':'on'}
 
 data_fc = {}
@@ -324,6 +324,12 @@ for sbj in tqdm(sbj_list):
 for tedana_metric in ['#ICs (All)','#ICs (Likely BOLD)','#ICs (Unlikely BOLD)','Var. Exp. (Likely BOLD)','Var. Exp. (Unlikely BOLD)']:
     QC_metrics['C',tedana_metric] = QC_metrics['C',tedana_metric].reset_index()
     QC_metrics['R',tedana_metric] = QC_metrics['C',tedana_metric].copy()
+
+QC_metrics.keys()
+
+import pickle 
+with open(f'./cache/{DATASET}_QC_metrics.pkl', 'wb') as f:
+    pickle.dump(QC_metrics, f)
 
 # ***
 #

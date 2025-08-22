@@ -74,6 +74,7 @@ import subprocess
 import datetime
 from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR
+from utils.basics import get_dataset_index
 from sfim_lib.io.afni import load_netcc
 from sfim_lib.plotting.fc_matrices import hvplot_fc
 
@@ -85,15 +86,17 @@ import os
 port_tunnel = int(os.environ['PORT2'])
 print('++ INFO: Second Port available: %d' % port_tunnel)
 
-ATLAS_NAME = 'Power264-evaluation'
+DATASET='evaluation'
+
+ATLAS_NAME = f'Power264-{DATASET}'
 
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
 # # 1. Load Dataset Information
 
-dataset_info_df = pd.read_csv(osp.join(PRJ_DIR,'resources','good_scans.txt'))
-dataset_info_df = dataset_info_df.set_index(['Subject','Session'])
-print('++ Number of scans: %s scans' % dataset_info_df.shape[0])
+ds_index = get_dataset_index(DATASET)
+ses_list = list(ds_index.get_level_values('Session').unique())
+sbj_list = list(ds_index.get_level_values('Subject').unique())
 
 # # 2. Create Swarm Script to Extract ROI TS from Basic denoised data
 

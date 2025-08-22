@@ -24,16 +24,16 @@ def main():
     opts = process_command_line()
     print('++ INFO: Subject = %s' % opts.sbj)
     print('++ INFO: Session = %s' % opts.ses)
-    out_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D02_Preproc_fMRI_{opts.ses}',f'{opts.sbj}_{opts.ses}_GS_kappa_and_rho.txt')
+    out_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off',f'{opts.sbj}_{opts.ses}_GS_kappa_and_rho.txt')
     print('++ INFO: Output Path = %s' % out_path)
     # Echo Times
-    tes = list(TES_MSEC['Spreng_Scanner1'].values())
+    tes = list(TES_MSEC['evaluation'].values())
     ne  = len(tes)
     print('++ INFO: Echo Times in ms: %s' % str(tes))
 
     # Load the adaptive mask
     print('++ INFO: Loading adaptive mask...',end='')
-    mask_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D02_Preproc_fMRI_{opts.ses}','tedana_r01','adaptive_mask.nii.gz')
+    mask_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off','tedana_fastica','adaptive_mask.nii.gz')
     mask_img  = nib.load(mask_path)
     mask_data = mask_img.get_fdata()
     nx,ny,nz  = mask_data.shape
@@ -43,7 +43,7 @@ def main():
 
     # Extract number of acquisitions from first echo
     print('++ INFO: Extracting number of acquistions...', end='')
-    e1_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D02_Preproc_fMRI_{opts.ses}',f'pb03.{opts.sbj}.r01.e01.volreg+tlrc.HEAD')
+    e1_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off',f'pb03.{opts.sbj}.r01.e01.volreg+tlrc.HEAD')
     e1_img  = nib.load(e1_path)
     e1_data = e1_img.get_fdata()
     _,_,_,nt = e1_data.shape
@@ -52,8 +52,8 @@ def main():
     # Load individual echo data
     print("++ INFO: Loading individual echo datasets...")
     data_cat = np.zeros((nx*ny*nz,ne,nt))
-    for e,ee in enumerate(tqdm(list(TES_MSEC['Spreng_Scanner1'].keys()))):
-       path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D02_Preproc_fMRI_{opts.ses}',f'pb03.{opts.sbj}.r01.{ee}.volreg+tlrc.HEAD')
+    for e,ee in enumerate(tqdm(list(TES_MSEC['evaluation'].keys()))):
+       path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off',f'pb03.{opts.sbj}.r01.{ee}.volreg+tlrc.HEAD')
        img  = nib.load(path)
        data = img.get_fdata()
        data_cat[:,e,:] = data.reshape(nx*ny*nz,nt)
@@ -61,7 +61,8 @@ def main():
 
     # Load the Global Signal
     print("++ INFO: Loading GS Timeseries...")
-    gs_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D02_Preproc_fMRI_{opts.ses}',f'pb03.{opts.sbj}.r01.e02.volreg.scale.GSasis.1D')
+    gs_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off', f'pb06.{opts.sbj}.r01.tedana_fastica_OC.GS.demean.1D') #f'pb03.{opts.sbj}.r01.e02.volreg.GS.demean.1D')
+    print(' +       GS Path = %s' % gs_path)
     if osp.exists(gs_path):
        gs      = zscore(np.loadtxt(gs_path)).reshape(nt,1)
     else:
@@ -71,7 +72,7 @@ def main():
 
     # Load OC Dataset
     print("++ INFO: Loading optimally combined dataset...")
-    oc_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D02_Preproc_fMRI_{opts.ses}','tedana_r01','ts_OC.nii.gz')
+    oc_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off','tedana_fastica','ts_OC.nii.gz')
     oc_img  = nib.load(oc_path)
     oc_data = oc_img.get_fdata()
     data_optcom = oc_data.reshape(nx*ny*nz,nt)

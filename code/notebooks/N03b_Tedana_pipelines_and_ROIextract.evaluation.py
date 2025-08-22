@@ -31,24 +31,27 @@ from sfim_lib.io.afni import load_netcc
 from sfim_lib.plotting.fc_matrices import hvplot_fc
 from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, ATLAS_NAME, PRJ_DIR, CODE_DIR
+from utils.basics import get_dataset_index
 
 
 import getpass
 username = getpass.getuser()
 print(username)
 
+DATASET = 'evaluation'
+
 import os
 port_tunnel = int(os.environ['PORT2'])
 print('++ INFO: Second Port available: %d' % port_tunnel)
 
-ATLAS_NAME = 'Power264-evaluation'
+ATLAS_NAME = f'Power264-{DATASET}'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
 # # 1. Load Dataset Information
 
-dataset_info_df = pd.read_csv(osp.join(PRJ_DIR,'resources','good_scans.txt'))
-dataset_info_df = dataset_info_df.set_index(['Subject','Session'])
-print('++ Number of scans: %s scans' % dataset_info_df.shape[0])
+ds_index = get_dataset_index(DATASET)
+ses_list = list(ds_index.get_level_values('Session').unique())
+sbj_list = list(ds_index.get_level_values('Subject').unique())
 
 # # 2. Create Swarm Script to Extract ROI TS from fully denoised data
 
@@ -65,9 +68,9 @@ with open(script_path, 'w') as the_file:
     the_file.write('# Script Creation Date: %s\n' % str(datetime.date.today()))
     the_file.write(f'# swarm -f {script_path} -g 16 -t 8 -b 2 --time 02:00:00 --logdir {log_path} --partition quick,norm --module afni\n')
     the_file.write('\n')
-    for sbj,ses in list(dataset_info_df.index):
+    for sbj,ses in list(ds_index):
         for NORDIC in ['off','on']:
-            for TEDANA_TYPE in ['fastica-mdl']:#,'robustica']:
+            for TEDANA_TYPE in ['fastica']:
                 the_file.write(f'export SBJ={sbj} SES={ses} NORDIC={NORDIC} TEDANA_TYPE={TEDANA_TYPE} ATLAS_NAME={ATLAS_NAME} ATLAS_PATH={atlas_path} ATLASES_DIR={ATLASES_DIR}; sh  {CODE_DIR}/bash/S10_Tedana_pipelines_and_ROIextract.sh \n')
 the_file.close()     
 

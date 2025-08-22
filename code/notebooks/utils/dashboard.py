@@ -335,7 +335,7 @@ def cov_across_echoes_scatter_page(cov_data,qa_data,sbj,ses,pp, nordic, pairs_of
     
 # Static Group Level Report Functions
 # ====================================
-def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, palette='Set2', show_points=False,session='all', label_font_size=12, pair_weights=None):
+def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',show_stats=False, stat_test='t-test_paired',stat_annot_type='star', legend_location='best', remove_outliers_from_swarm=True, remove_outliers_from_statistics=False, dot_size=1, palette='Set2', show_points=False,session='all', label_font_size=12, pair_weights=None):
     """
     Create Static Bar Graph for a given quality metric
 
@@ -378,12 +378,26 @@ def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',sho
     hue_options = list(df[hue].unique())
     num_x_categories = len(x_options)
     num_hue_categories = len(hue_options)
-    
+
+
+    # Calculate Q1, Q3, and IQR
+    Q1 = df[qc_metric].quantile(0.25)
+    Q3 = df[qc_metric].quantile(0.75)
+    IQR = Q3 - Q1
+
+    # Define outlier bounds
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
     df_swarm = df.copy()
     if remove_outliers_from_swarm:
-        quantile_value = df[qc_metric].quantile(.97)
-        df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
-        df_swarm.dropna(inplace=True)
+        df_swarm = df_swarm[(df_swarm[qc_metric] >= lower_bound) & (df_swarm[qc_metric] <= upper_bound)]
+        #quantile_value = df[qc_metric].quantile(.97)
+        #df_swarm[qc_metric]=df_swarm[qc_metric].where(df_swarm[qc_metric] <= quantile_value, np.nan)
+        #df_swarm.dropna(inplace=True)
+    if remove_outliers_from_statistics:
+        df = df[(df[qc_metric] >= lower_bound) & (df[qc_metric] <= upper_bound)]
+        
     pairs  = [((x,h[1]),(x,h[0])) for x in x_options for h in combinations(hue_options,2)]
     colors = sns.color_palette(palette,num_hue_categories) 
 
@@ -392,7 +406,7 @@ def get_static_report(qa,fc_metric,qc_metric,x='Pre-processing',hue='NORDIC',sho
     sns.despine(top=True, right=True)
     sns.barplot(data=df,hue=hue, y=qc_metric, x=x, alpha=0.5, ax =axs, errorbar=('ci',95), palette=colors);
     if show_points:
-        sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=1, dodge=True, legend=False, palette=colors);
+        sns.swarmplot(data=df_swarm,hue=hue, y=qc_metric, x=x, ax =axs, s=dot_size, dodge=True, legend=False, palette=colors);
     
     if show_stats:
         annotation = Annotator(axs, pairs, data=df, x=x, y=qc_metric, hue=hue);

@@ -64,6 +64,8 @@ def main():
     slibase_df.columns = slibase_obj.labels
     slibase_df         = slibase_df[3::].reset_index(drop=True)
     slibase_det_df     = slibase_df.copy()
+    print(slibase_det_df.head(2))
+    print(' +      Initial number of physio regressors available is %d' % slibase_det_df.shape[1])
     print('[DONE]')
     print('++ INFO: Detrending (mean and linear trend) the physio regressors')
     for c in tqdm(slibase_det_df.columns):

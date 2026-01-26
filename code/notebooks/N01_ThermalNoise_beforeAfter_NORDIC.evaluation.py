@@ -15,29 +15,24 @@
 # * Thermal noise should be TE independent, yet becuase the suboptimal way in which we are measuring thermal noise, a slight difference migth occur.
 # * Thermal noise should be significantly smaller after NORDIC for all echoes.
 
-# In[3]:
+# In[1]:
 
 
 import pandas as pd
 import os.path as osp
-import hvplot.pandas
 import seaborn as sns
 import numpy as np
 import pandas as pd
-import panel as pn
 from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, PRJ_DIR
 from statannotations.Annotator import Annotator
 import matplotlib.pyplot as plt
-import xarray as xr
-import hvplot.xarray
-import holoviews as hv
 
 
 # 
 # ### Load list of scans from the Evaluation dataset entering the final set of analyses
 
-# In[4]:
+# In[2]:
 
 
 dataset_info_df = pd.read_csv(osp.join(PRJ_DIR,'resources','good_scans.txt'))
@@ -47,7 +42,7 @@ print('++ Number of scans: %s scans' % dataset_info_df.shape[0])
 
 # ### Load the Thermmal noise estiamtes for these scans
 
-# In[5]:
+# In[3]:
 
 
 df_list = []
@@ -64,7 +59,7 @@ df = pd.DataFrame(df_list)
 
 # ### Separate the data by session ID
 
-# In[6]:
+# In[4]:
 
 
 df_ses1 = df.set_index('Session').loc['ses-1'].copy().reset_index(drop=True)
@@ -73,7 +68,7 @@ df_ses2  = df.set_index('Session').loc['ses-2'].copy().reset_index(drop=True)
 
 # ### Print the overall improvement in Thermal Noise for the whole dataset
 
-# In[7]:
+# In[5]:
 
 
 aux = (100 * (df.set_index(['Subject','Session','NORDIC','Echo']).loc[:,:,'off',:] - df.set_index(['Subject','Session','NORDIC','Echo']).loc[:,:,'on',:]) / df.set_index(['Subject','Session','NORDIC','Echo']).loc[:,:,'off',:]).describe()
@@ -82,7 +77,7 @@ print('Thermal Noise reduction after NORDIC (%%): %0.2f +/- %0.2f' % (aux.loc['m
 
 # ### Generate Suppl. Figure 2.b panel
 
-# In[8]:
+# In[6]:
 
 
 fig, axs = plt.subplots(1,2,figsize=(14,7))
@@ -103,4 +98,10 @@ annotation = Annotator(axs[1], pairs, data=df_ses2, hue='NORDIC', y='Thermal Noi
 annotation.configure(test='t-test_paired', loc='inside', verbose=0, comparisons_correction="Bonferroni");
 annotation.apply_test(alternative='two-sided');
 annotation.annotate();
+
+
+# In[ ]:
+
+
+
 

@@ -20,17 +20,12 @@
 
 import pandas as pd
 import os.path as osp
-import hvplot.pandas
 import seaborn as sns
 import numpy as np
-import panel as pn
 from tqdm import tqdm
-from utils.basics import PRCS_DATA_DIR, PRJ_DIR
+from utils.basics import PRCS_DATA_DIR
 from statannotations.Annotator import Annotator
 import matplotlib.pyplot as plt
-import xarray as xr
-import hvplot.xarray
-import holoviews as hv
 
 
 # 
@@ -72,7 +67,7 @@ df_CardG  = df.set_index('Session').loc['cardiac_gated'].copy().reset_index(drop
 
 # ### The next cell computes the mean and stdev of the reduction in thermal noise. We report these values in the manuscript
 
-# In[24]:
+# In[5]:
 
 
 aux = (100 * (df.set_index(['Subject','Session','NORDIC','Echo']).loc[:,:,'off',:] - df.set_index(['Subject','Session','NORDIC','Echo']).loc[:,:,'on',:]) / df.set_index(['Subject','Session','NORDIC','Echo']).loc[:,:,'off',:]).describe()
@@ -81,7 +76,7 @@ print('Themal Noise reduction after NORDIC (%%): %0.2f +/- %0.2f' % (aux.loc['me
 
 # ### And now we generate Supplementary Figure 2.a
 
-# In[8]:
+# In[6]:
 
 
 fig, axs = plt.subplots(1,2,figsize=(14,7))

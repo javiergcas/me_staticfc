@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Description
+# # Description: Final steps of the tedana pipeline for the "discovery" dataset
 # 
 # This notebook implements the extra steps (beyond ```afni_proc```) needed to complete the per-echo **TEDANA/fastica pipeline** which includes the following operations:
 # 

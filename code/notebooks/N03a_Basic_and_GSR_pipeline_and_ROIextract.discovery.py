@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Description
+# # Description: Basic and GSR Pipelines for the "discovery" dataset
 # 
 # At this point data has been pre-processed with an ```afni_proc```, which has performed the following operations:
 # 
@@ -16,8 +16,6 @@
 # 
 #   > **NOTE**: If we want to include fanaticor, we would have to add ```Local_FSWe_rall``` as a regressor in all other pipelines.
 #   
-#   > **NOTE**: This execution of tedana (as part of afni_proc) is only for getting the mask with good voxels in all echoes. We do not use the outcomes of this run of tedana for anything else. We will run tedana again later with the correct options to get individual echoes denoised.
-# 
 # Program ```afni_proc``` is meant to run a traditional me analysis, meaning it will combine echoes and denoised the combined echo data. In this project, becuase we are interested on estimating FC across the echoes, we need to denoise the echoes separately. The N03a-x notebooks help us do this.
 # 
 # In particular we need echo denoised data following 3 different pipelines. 
@@ -30,7 +28,7 @@
 #     * **output FC**: ```errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_Basic.${ATLAS_NAME}_000.netcc```
 #     * **output TSNR**: ```TSNR_FB_${EC}_ALL_Basic.txt```
 # 
-#     > **NOTE**: This pipeline is implemented in this notebook when running ```S09_Basic_and_GSR_pipeline_and_ROIextract.sh```. Runs the pipeline for both NORDIC scenarios.
+#     > **NOTE**: This pipeline is implemented in this notebook when running ```S08_Basic_and_GSR_pipeline_and_ROIextract.sh```. Runs the pipeline for both NORDIC scenarios.
 # ***
 # 
 # * **Global Signal Regression pipeline**: relies on afni_proc outputs up to the mask step. Then it does:
@@ -42,7 +40,7 @@
 #     * **output FC**: ```errts.${SBJ}.r01.${EC}.volreg.scale.tproject_ALL_GS.${ATLAS_NAME}_000.netcc```
 #     * **output TSNR**: ```TSNR_FB_${EC}_ALL_GS.txt```
 # 
-#     > **NOTE**: This pipeline is implemented in this notebook when running ```S09_Basic_and_GSR_pipeline_and_ROIextract.sh```. Runs the pipeline for both NORDIC scenarios.
+#     > **NOTE**: This pipeline is implemented in this notebook when running ```S08_Basic_and_GSR_pipeline_and_ROIextract.sh```. Runs the pipeline for both NORDIC scenarios.
 # 
 # ***
 # 
@@ -50,8 +48,6 @@
 # 
 #     * Same as **Basic** pipeline, but also includes as extra nuisance regressors components marked as "bad" by tedana (run using the fastica pipeline)
 #     * This not done here, but on the next notebook.
-# 
-# 
 # ***
 
 # In[1]:
@@ -67,7 +63,7 @@ from sfim_lib.io.afni import load_netcc
 from sfim_lib.plotting.fc_matrices import hvplot_fc
 
 
-# Get username. We use this to create user specific location for swarm and log files.
+# Get username. We use this to create user specific locations for SWARM and log files.
 
 # In[2]:
 
@@ -77,7 +73,7 @@ username = getpass.getuser()
 print(username)
 
 
-# Select dataset, atlas
+# Select dataset and atlas
 
 # In[3]:
 
@@ -119,9 +115,9 @@ if not osp.exists(log_path):
 print(log_path)
 
 
-# Create the SWARM script. This script will have one line per scan that calls the script ```S09_Basic_and_GSR_pipeline_and_ROIextract.sh```. This script, as already stated, runs the basic and GSR pipelines per echo. It also extract ROI representative timeseries, FC matrices and TSNR maps
+# Create the SWARM script. This script will have one line per scan that calls the script ```S08_Basic_and_GSR_pipeline_and_ROIextract.sh```. This script, as already stated, runs the basic and GSR pipelines per echo. It also extract ROI representative timeseries, FC matrices and TSNR maps
 
-# In[7]:
+# In[ ]:
 
 
 with open(script_path, 'w') as the_file:
@@ -131,7 +127,7 @@ with open(script_path, 'w') as the_file:
     for sbj,ses in list(ds_index):
         atlas_path  = f'{ATLASES_DIR}/{ATLAS_NAME}/{ATLAS_NAME}.nii.gz'
         for NORDIC in ['on','off']:
-            the_file.write(f'export SBJ={sbj} SES={ses} NORDIC={NORDIC} ATLAS_NAME={ATLAS_NAME} ATLAS_PATH={atlas_path} ATLASES_DIR={ATLASES_DIR}; sh  {CODE_DIR}/bash/S09_Basic_and_GSR_pipeline_and_ROIextract.sh \n')
+            the_file.write(f'export SBJ={sbj} SES={ses} NORDIC={NORDIC} ATLAS_NAME={ATLAS_NAME} ATLAS_PATH={atlas_path} ATLASES_DIR={ATLASES_DIR}; sh  {CODE_DIR}/bash/S08_Basic_and_GSR_pipeline_and_ROIextract.sh \n')
 the_file.close()     
 
 print(f'Swarm script written to: {script_path}')
@@ -274,7 +270,7 @@ def plot_mot(scan):
     return aux_df.hvplot(width=1000,c='k')
 
 
-# In[ ]:
+# In[25]:
 
 
 dashboard = pn.Row(pn.Column(scan_select,NORDIC_select),pn.Column(plot_fc,plot_mot)).show()

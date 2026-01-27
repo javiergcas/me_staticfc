@@ -52,8 +52,8 @@ echo "==========================================="
     1d_tool.py -overwrite -infile pb06.${SBJ}.r01.tedana_${TEDANA_TYPE}_OC.GS.1D -demean -write pb06.${SBJ}.r01.tedana_${TEDANA_TYPE}_OC.GS.demean.1D 
 
 
-echo "++ Scaling volreg versions of each echo:"
-echo "========================================"
+echo "++ Extracts the temporal mean of each denoised echo (for later scaling)"
+echo "======================================================================="
 for EC in e01 e02 e03
 do
     echo " + scaling [${EC}]"
@@ -64,7 +64,7 @@ echo "++ Denoising each echo separately (using MEICA bad components)"
 echo "=============================================================="
 for EC in e01 e02 e03
 do
-   echo " + Tedana Denoising echo [${EC} | ALL"
+   echo " + Tedana Denoising echo [${EC}"
    3dTproject -overwrite                                                                      \
                -polort 0                                                                      \
                -input pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc                     \
@@ -73,35 +73,40 @@ do
                -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
    3dcalc -overwrite -a rm.mean_pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Tedana-${TEDANA_TYPE}+tlrc -expr 'a+b'     -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Tedana-${TEDANA_TYPE}
    3dcalc -overwrite -a rm.mean_pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_ALL_Tedana-${TEDANA_TYPE}+tlrc -expr '100*(b-a)/a' -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_ALL_Tedana-${TEDANA_TYPE}
+done
 
-   echo " + Tedana Denoising echo [${EC} | KILL"
-   3dTproject -overwrite                                                                      \
-               -polort 0                                                                      \
-               -input pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc                     \
-               -ort X.nocensor.xmat.${EC}.1D                                                  \
-               -censor censor_${SBJ}_combined_2.1D                                            \
-               -cenmode KILL                                                                  \
-               -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_KILL_Tedana-${TEDANA_TYPE}      \
-               -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz
-   3dcalc -overwrite -a rm.mean_pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_KILL_Tedana-${TEDANA_TYPE}+tlrc -expr 'a+b'     -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_KILL_Tedana-${TEDANA_TYPE}
-   3dcalc -overwrite -a rm.mean_pb06.${SBJ}.r01.${EC}.tedana_${TEDANA_TYPE}_dn+tlrc -b errts.${SBJ}.r01.${EC}.volreg.tproject_KILL_Tedana-${TEDANA_TYPE}+tlrc -expr '100*(b-a)/a' -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_KILL_Tedana-${TEDANA_TYPE}
+# Extract ROI Timeseries
+# ----------------------
+echo "++ Extracting ROI Timeseries per echo for atlas [${ATLAS_NAME}]"
+echo "==============================================================="
+INTERP_MODE='ALL'
+SCENARIO=`echo Tedana-${TEDANA_TYPE}`
+for EC in e01 e02 e03
+do
+  echo " + Extracting ROI Timeseries and connectivity for [${EC}]"
+  3dNetCorr -overwrite -push_thru_many_zeros                                                              \
+            -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz                   \
+            -in_rois ${ATLAS_PATH}                                                                        \
+            -inset  errts.${SBJ}.r01.${EC}.volreg.spc.tproject_${INTERP_MODE}_${SCENARIO}+tlrc          \
+            -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_${INTERP_MODE}_${SCENARIO}.${ATLAS_NAME}
 
+  3dROIstats -quiet \
+             -mask ${ATLAS_PATH} \
+              errts.${SBJ}.r01.${EC}.volreg.spc.tproject_${INTERP_MODE}_${SCENARIO}+tlrc > errts.${SBJ}.r01.${EC}.volreg.spc.tproject_${INTERP_MODE}_${SCENARIO}.${ATLAS_NAME}_000.netts
 done
 
 echo "++ Computing Full Brain TSNR for Basic and GSasis"
 echo "================================================="
 for EC in e01 e02 e03
 do
-  for SCENARIO in ALL_Tedana-${TEDANA_TYPE} KILL_Tedana-${TEDANA_TYPE}
-  do
-      3dTstat -overwrite -cvarinv -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}.TSNR.nii errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}+tlrc
-      3dcalc  -overwrite \
-             -a ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz \
-             -b errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}.TSNR.nii \
-             -expr 'a*b' \
-             -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}.TSNR.nii
-      # Compute TSNR at the whole-brain level
-      compute_ROI_stats.tcsh                                                           \
+  3dTstat -overwrite -cvarinv -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}.TSNR.nii errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}+tlrc
+  3dcalc  -overwrite                                                              \
+         -a ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz \
+         -b errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}.TSNR.nii           \
+         -expr 'a*b'                                                              \
+         -prefix errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}.TSNR.nii
+  # Compute TSNR at the whole-brain level
+  compute_ROI_stats.tcsh                                                               \
          -out_dir    tsnr_stats_regress                                                \
          -stats_file tsnr_stats_regress/TSNR_FB_${EC}_${SCENARIO}.txt                  \
          -dset_ROI   ../D03_Preproc_${SES}_NORDIC-off/mask_epi_anat.${SBJ}+tlrc        \
@@ -109,42 +114,16 @@ do
          -rset_label brain                                                             \
          -rval_list  1
 
-     # Compute TSNR at the ROI level (Same ROIs as afni_proc)
-     compute_ROI_stats.tcsh                                                            \
+  # Compute TSNR at the ROI level (Same ROIs as afni_proc)
+  compute_ROI_stats.tcsh                                                               \
          -out_dir    tsnr_stats_regress                                                \
          -stats_file tsnr_stats_regress/TSNR_ROIs_${EC}_${SCENARIO}.txt                \
          -dset_ROI   ROI_import_MNI_2009c_asym_resam+tlrc                              \
          -dset_data  errts.${SBJ}.r01.${EC}.volreg.tproject_${SCENARIO}.TSNR.nii       \
          -rset_label MNI_2009c_asym                                                    \
          -rval_list  ALL_LT
-
-  done
 done
 
-# Extract ROI Timeseries
-# ----------------------
-echo "++ Extracting ROI Timeseries per echo for atlas [${ATLAS_NAME}]"
-echo "==============================================================="
-for EC in e01 e02 e03
-do
-  for INTERP_MODE in ALL KILL
-  do
-    for SCENARIO in Tedana-${TEDANA_TYPE}
-       do
-       echo " + Extracting ROI Timeseries and connectivity for [${EC}]"
-       3dNetCorr -overwrite -push_thru_many_zeros                                                              \
-                 -mask ../D03_Preproc_${SES}_NORDIC-off/mask_tedana_at_least_one_echo.nii.gz                   \
-                 -in_rois ${ATLAS_PATH}                                                                        \
-                 -inset  errts.${SBJ}.r01.${EC}.volreg.spc.tproject_${INTERP_MODE}_${SCENARIO}+tlrc          \
-                 -prefix errts.${SBJ}.r01.${EC}.volreg.spc.tproject_${INTERP_MODE}_${SCENARIO}.${ATLAS_NAME}
-
-       3dROIstats -quiet \
-                  -mask ${ATLAS_PATH} \
-                  errts.${SBJ}.r01.${EC}.volreg.spc.tproject_${INTERP_MODE}_${SCENARIO}+tlrc > errts.${SBJ}.r01.${EC}.volreg.spc.tproject_${INTERP_MODE}_${SCENARIO}.${ATLAS_NAME}_000.netts
-    done 
-  done
-done
-pwd
 echo "++ ========================="
 echo "++ Script finished correctly"
 echo "++ ========================="

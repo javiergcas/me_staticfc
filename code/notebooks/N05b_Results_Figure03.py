@@ -20,12 +20,17 @@
 # * We create a scatter plot comparing these two.
 # * We create a distribution of trigger delay times for two representative scans
 
+# +
 import seaborn as sns
 import pandas as pd
 import panel as pn
 import matplotlib.pyplot as plt
+from utils.basics import get_dataset_index, DOWNLOAD_DIRS
 import pickle
+import os.path as osp
+
 pn.extension()
+# -
 
 DATASET='discovery'
 CENSOR_MODE='ALL'
@@ -61,6 +66,26 @@ from bokeh.resources import INLINE
 output_notebook(INLINE)
 
 # # Examine Triggers for cardiac-gated scans
+
+ds_index = get_dataset_index('discovery')
+
+df = None
+for sbj,ses in ds_index:
+    if ses == 'constant_gated':
+        continue
+    path = osp.join(DOWNLOAD_DIRS['discovery'],sbj,ses,'func',f'{sbj}_{ses}_task-rest.Triggers.1D')
+    try:
+        trigger_df = pd.read_csv(path, sep=' ', skiprows=2, header=None)
+        trigger_df.columns = ['onset','slice','acquisition']
+        trigger_df = trigger_df.set_index(['slice','acquisition']).loc[0,:].diff()
+        if df is None:
+            df = trigger_df
+        else:
+            df = pd.concat([df,trigger_df])
+    except:
+        print('No trigger file available for %s' % path)
+
+df.describe()
 
 # Load Trigger info for cardiac-gated scan with highest pBOLD
 path = '/data/SFIMJGC_HCP7T/BCBL2024/openeuro/meica_eval/MGSBJ02/cardiac_gated/func/MGSBJ02_cardiac_gated_task-rest.Triggers.1D'

@@ -7,6 +7,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import os.path as osp
+import pickle 
 
 from scipy.stats import zscore
 from afnipy.lib_afni1D import Afni1D
@@ -96,7 +97,10 @@ def main():
     # Save Model to disk
     # ==================
     print("++ INFO: Saving model to disk [%s]" % output_path)
-    model.save(output_path)
+    output_dict = {'model':model,'selected_regs':sel_physio_regs}
+
+    with open(output_path, 'wb') as f:
+        pickle.dump(output_dict, f)
     
 if __name__ == '__main__':
    sys.exit(main())

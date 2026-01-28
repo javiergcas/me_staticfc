@@ -7,15 +7,22 @@ import statsmodels.api as sm
 PRJ_DIR       = '/data/SFIMJGC_HCP7T/BCBL2024/'
 ATLAS_NAME    = 'Schaefer2018_400Parcels_17Networks'
 
-PRCS_DATA_DIR = osp.join(PRJ_DIR,'prcs_data')
-ATLASES_DIR   = osp.join(PRJ_DIR,'atlases')
-CODE_DIR      = osp.join(PRJ_DIR,'me_staticfc','code')
-SPRENG_DOWNLOAD_DIR = osp.join(PRJ_DIR,'openeuro','des003592-download')
+PRCS_DATA_DIR   = osp.join(PRJ_DIR,'prcs_data')
+ATLASES_DIR     = osp.join(PRJ_DIR,'atlases')
+CODE_DIR        = osp.join(PRJ_DIR,'me_staticfc','code')
+DOWNLOAD_DIRS   = {'evaluation':osp.join(PRJ_DIR,'openeuro','des003592-download'),
+                   'discovery':osp.join(PRJ_DIR,'openeuro','meica_eval')}
 
 TES_MSEC = {'discovery':{'e01':13.9,'e02':31.7, 'e03':49.5},
             'evaluation':{'e01':13.7,'e02':30,'e03':47},}
+FMRI_TRS={'discovery':'2.5s',
+     'evaluation':'3s'}
 
-NUM_DISCARDED_VOLUMES = {'evaluation':3.0}
+FMRI_FINAL_NUM_SAMPLES={'discovery':192,
+                        'evaluation':201}
+
+NUM_DISCARDED_VOLUMES = {'discovery':3.0,
+                         'evaluation':3.0}
 
 SESSIONS = {'discovery':['constant_gating','cardiac_gating'],
             'evaluation':['ses-1','ses-2']}
@@ -24,6 +31,9 @@ echo_pairs_tuples   = [i for i in combinations_with_replacement(['e01','e02','e0
 echo_pairs          = [('|').join(i) for i in echo_pairs_tuples]
 pairs_of_echo_pairs = ['|'.join((e_x[0],e_x[1]))+'_vs_'+'|'.join((e_y[0],e_y[1])) for e_x,e_y in combinations(echo_pairs_tuples,2)]
 
+LABEL_MAPPING = {'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana','ALL_NoRegression':'No Regression',
+                 'KILL_Basic':'Basic w/ censoring','KILL_GS':'GSR w/ censoring','KILL_Tedana-fastica':'Tedana w/censoring','KILL_NoRegression':'No Regression w/censoring',
+                 'NORDIC':'on'}
 # Echo Time information for the Spreng Dataset
 #TES_MSEC_PER_SCANNER = {'1':{'e01':13.7,'e02':30,'e03':47},
 #                        '2':{'e01':14,'e02':29.96,'e03':45.92}}

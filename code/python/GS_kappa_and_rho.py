@@ -16,16 +16,19 @@ from tqdm import tqdm
 
 def process_command_line():
     parser = argparse.ArgumentParser(description="Global Signal Kappa and Rho computation")
-    parser.add_argument("-s", "--subject",  action="store", type=str, required=True, dest="sbj", default=None, help="Subject ID")
-    parser.add_argument("-r", "--session",  action="store", type=str, required=True, dest="ses", default=None, help="Session ID")
+    parser.add_argument("-s", "--subject",     action="store", type=str, required=True,   dest="sbj", default=None, help="Subject ID")
+    parser.add_argument("-r", "--session",     action="store", type=str, required=True,   dest="ses", default=None, help="Session ID")
+    parser.add_argument("-c", "--censor_mode", action="store", type=str, required=False, dest="censor_mode", default='ALL', help="Cenosring mode", choices=['ALL','KILL'])
     return parser.parse_args()
 
 def main():
     opts = process_command_line()
-    print('++ INFO: Subject = %s' % opts.sbj)
-    print('++ INFO: Session = %s' % opts.ses)
-    out_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off',f'{opts.sbj}_{opts.ses}_GS_kappa_and_rho.txt')
+    print('++ INFO: Subject        = %s' % opts.sbj)
+    print('++ INFO: Session        = %s' % opts.ses)
+    print('++ INFO: Censoring Mode = %s' % opts.censor_mode)
+    out_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off',f'{opts.sbj}_{opts.ses}_GS_kappa_and_rho.{opts.censor_mode}.txt')
     print('++ INFO: Output Path = %s' % out_path)
+    
     # Echo Times
     tes = list(TES_MSEC['evaluation'].values())
     ne  = len(tes)
@@ -49,6 +52,14 @@ def main():
     _,_,_,nt = e1_data.shape
     print('%s time points.' % nt)
 
+    # Attempt loading censoring information
+    if opts.censor_mode != 'ALL':
+        censor_path = osp.join(PRCS_DATA_DIR,opts.sbj,f'D03_Preproc_{opts.ses}_NORDIC-off',f'censor_{opts.sbj}_combined_2.1D')
+        censor = np.loadtxt(censor_path).astype(bool)
+    else:
+        censor = np.ones(nt).astype(bool)
+    print("++ Number of censored timepoints = %d of %d available" % (nt-censor.sum(),nt))
+    
     # Load individual echo data
     print("++ INFO: Loading individual echo datasets...")
     data_cat = np.zeros((nx*ny*nz,ne,nt))
@@ -90,9 +101,9 @@ def main():
         make_figures=False,
         verbose=False)
     # Compute Kappa and Rho
-    component_table, mixing = generate_metrics(data_cat=data_cat,
-        data_optcom=data_optcom, 
-        mixing=gs,
+    component_table, mixing = generate_metrics(data_cat=data_cat[:,:,censor],
+        data_optcom=data_optcom[:,censor], 
+        mixing=gs[censor,:],
         adaptive_mask=mask_vec,
         tes=tes,
         io_generator=io_generator,

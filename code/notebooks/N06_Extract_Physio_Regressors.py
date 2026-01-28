@@ -27,14 +27,13 @@ from bokeh.io import output_notebook
 from bokeh.resources import INLINE
 output_notebook(INLINE)
 
-# +
 import os.path as osp
 import pandas as pd
 import numpy as np
 import os
 from tqdm import tqdm
 import datetime
-from utils.basics import PRJ_DIR, PRCS_DATA_DIR, SPRENG_DOWNLOAD_DIR, CODE_DIR, read_group_physio_reports
+from utils.basics import PRJ_DIR, PRCS_DATA_DIR, DOWNLOAD_DIRS, CODE_DIR, read_group_physio_reports
 from sklearn.ensemble import IsolationForest
 import hvplot.pandas
 import holoviews as hv
@@ -42,15 +41,15 @@ from scipy.stats import zscore
 import statsmodels.api as sm
 from afnipy.lib_afni1D import Afni1D
 import shutil
-
+import pickle
 from utils.basics import get_dataset_index
-# -
 
 import getpass
 username = getpass.getuser()
 print(username)
 
 DATASET = 'evaluation'
+DOWNLOAD_DIR = DOWNLOAD_DIRS[DATASET]
 
 # Get list of fMRI scans from the Spreng Dataset that passed our intial QC and are included in this study
 
@@ -87,11 +86,11 @@ with open(script_path, 'w') as the_file:
     the_file.write(f'# swarm -f {script_path} -g 8 -t 8 -b 20 --time 00:10:00 --logdir {log_path} --partition quick,norm --module afni \n')
     the_file.write('\n')
     for sbj,ses in tqdm(ds_index):
-        physio_path = osp.join(SPRENG_DOWNLOAD_DIR,sbj,ses,'func',f'{sbj}_{ses}_task-rest_physio.tsv.gz')
-        json_path   = osp.join(SPRENG_DOWNLOAD_DIR,sbj,ses,'func',f'{sbj}_{ses}_task-rest_physio.json')
+        physio_path = osp.join(DOWNLOAD_DIR,sbj,ses,'func',f'{sbj}_{ses}_task-rest_physio.tsv.gz')
+        json_path   = osp.join(DOWNLOAD_DIR,sbj,ses,'func',f'{sbj}_{ses}_task-rest_physio.json')
         if osp.exists(physio_path) and osp.exists(json_path):
             for ec in [1,2,3]:
-                dset_path = osp.join(SPRENG_DOWNLOAD_DIR,sbj,ses,'func',f'{sbj}_{ses}_task-rest_echo-{ec}_bold.nii.gz')
+                dset_path = osp.join(DOWNLOAD_DIR,sbj,ses,'func',f'{sbj}_{ses}_task-rest_echo-{ec}_bold.nii.gz')
                 out_dir = osp.join(PRCS_DATA_DIR,sbj,'D04_Physio')
                 prefix = f'{sbj}_{ses}_task-rest_echo-{ec}'
                 #the_file.write(f'physio_calc.py -phys_file {physio_path} -phys_json {json_path} -dset_epi {dset_path} -out_dir {out_dir} -prefix {prefix} \n')
@@ -175,7 +174,7 @@ outliers = labels == -1
 df_card = report_card_summary_df['peak ival over dset mean std'].copy()
 df_card.columns=['Mean','St.Dev.']
 df_card['color'] = ['red' if c else 'green' for c in outliers]
-plot = df_card.hvplot.scatter(x='Mean',y='St.Dev.', c='color', title='Cardiac Inter-peak Interval (seconds)', aspect='square', hover_cols=['Subject','Run'], alpha=0.5) * hv.VSpan(60,100)
+plot = df_card.hvplot.scatter(x='Mean',y='St.Dev.', c='color', title='Cardiac Inter-peak Interval (seconds)', aspect='square', hover_cols=['Subject','Run'], alpha=0.5) 
 
 plot
 
@@ -198,7 +197,7 @@ outliers = labels == -1
 df_resp = report_resp_summary_df['peak ival over dset mean std'].copy()
 df_resp.columns=['Mean','St.Dev.']
 df_resp['color'] = ['red' if c else 'green' for c in outliers]
-plot = df_resp.hvplot.scatter(x='Mean',y='St.Dev.', c='color', title='Cardiac Inter-peak Interval (seconds)', aspect='square', hover_cols=['Subject','Run'], alpha=0.5) * hv.VSpan(60,100)
+plot = df_resp.hvplot.scatter(x='Mean',y='St.Dev.', c='color', title='Resp. Inter-peak Interval (seconds)', aspect='square', hover_cols=['Subject','Run'], alpha=0.5)
 plot
 
 # In the figure above, each dot represents a scan. Red dots are scans marked as outliers.
@@ -212,7 +211,8 @@ len(scans_with_reasonable_resp)
 #
 # We now create a final list of scans with valid physiological data by keeping only scans not marked as outliers both from the cardiac and respiration perspective.
 
-selected_scans = scans_with_reasonable_cardiac.intersection(scans_with_reasonable_resp)
+#selected_scans = scans_with_reasonable_cardiac.intersection(scans_with_reasonable_resp)
+selected_scans = scans_with_complete_physio
 print("++ INFO: Number of scans with reasonable physiological regressors: %d scans" % len(selected_scans))
 
 # ***
@@ -244,7 +244,7 @@ print(log_path)
 
 with open(script_path, 'w') as the_file:
     the_file.write('# Script Creation Date: %s\n' % str(datetime.date.today()))
-    the_file.write(f'# swarm -f {script_path} -g 8 -t 8 -b 20 --time 00:10:00 --logdir {log_path} --partition quick,norm --module afni \n')
+    the_file.write(f'# swarm -f {script_path} -g 8 -t 8 -b 5 --time 00:45:00 --logdir {log_path} --partition quick,norm --module afni \n')
     the_file.write('\n')
     for sbj,ses in tqdm(selected_scans):
         gs_path      = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.GS.1D') #f'pb03.{sbj}.r01.e02.volreg.spc.GS.1D')
@@ -266,7 +266,9 @@ df = pd.DataFrame(index=selected_scans,columns=['Var. Exp. by Physio Regressors'
 for sbj,ses in tqdm(selected_scans):
     # Variance Explained by Regressors
     model_path  = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.GS.PhysioModeling.pkl')
-    model = sm.load(model_path)
+    with open(model_path, 'rb') as f:
+        loaded_dict = pickle.load(f)
+    model = loaded_dict['model'] #sm.load(model_path)
     df.loc[(sbj,ses),'Var. Exp. by Physio Regressors'] = model.rsquared
 df=df.infer_objects()
 df.to_csv('./cache/real_varexp_gs_physio.csv')
@@ -304,7 +306,7 @@ n_null_cases = 10000
 selected_scans_df = pd.DataFrame(index=selected_scans)
 with open(script_path, 'w') as the_file:
     the_file.write('# Script Creation Date: %s\n' % str(datetime.date.today()))
-    the_file.write(f'# swarm -f {script_path} -g 8 -t 8 -b 20 --time 00:10:00 --logdir {log_path} --partition quick,norm --module afni \n')
+    the_file.write(f'# swarm -f {script_path} -g 8 -t 8 -b 10 --time 00:20:00 --logdir {log_path} --partition quick,norm --module afni \n')
     the_file.write('\n')
     for i in tqdm(range(n_null_cases)):
         ii = str(i).zfill(5)
@@ -330,8 +332,10 @@ df = pd.DataFrame(index=range(n_null_cases),columns=['Var. Exp. by Physio Regres
 for i in tqdm(range(n_null_cases)):
     ii = str(i).zfill(5)
     model_path  = osp.join(perm_dir,f'gs_phys_varex_{ii}.pkl')
-    model = sm.load(model_path)
-    df.loc[i,'Var. Exp. by Physio Regressors (NULL)'] = model.rsquared
+    with open(model_path, 'rb') as f:
+        loaded_dict = pickle.load(f)
+    model = loaded_dict['model'] #sm.load(model_path)
+    df.loc[i,'Var. Exp. by Physio Regressors (NULL)'] = model.rsquared_adj
 df=df.infer_objects()
 df.index.name='Permutation'
 df.to_csv('./cache/null_varexp_gs_physio.csv')
@@ -354,6 +358,41 @@ df_real[df_real['Var. Exp. by Physio Regressors']> p05_val]
 #
 #
 # # Check Results
+
+from afnipy import lib_physio_reading as lpr
+from afnipy import lib_physio_opts    as lpo
+import copy
+sbj='sub-158'
+ses='ses-1'
+
+input_line = ['./physio_calc.py', 
+              '-phys_file', osp.join(DOWNLOAD_DIR,'/data/SFIMJGC_HCP7T/BCBL2024/openeuro/des003592-download/sub-158/ses-2/func/sub-158_ses-2_task-rest_physio.tsv.gz', 
+              '-phys_json', '/data/SFIMJGC_HCP7T/BCBL2024/openeuro/des003592-download/sub-158/ses-2/func/sub-158_ses-2_task-rest_physio.json', 
+              '-dset_epi', '/data/SFIMJGC_HCP7T/BCBL2024/openeuro/des003592-download/sub-158/ses-2/func/sub-158_ses-2_task-rest_echo-1_bold.nii.gz', '-out_dir', './out', '-prefilt_mode', 'median', '-prefilt_max_freq', '50']
+
+args_orig = copy.deepcopy(input_line)
+args_dict = lpo.main_option_processing( input_line )
+retobj  = lpr.retro_obj( args_dict, args_orig=args_orig )
+
+pd.DataFrame(retobj.data['resp'].ts_orig).hvplot()
+
+pd.DataFrame(retobj.data['card'].ts_orig).hvplot(width=2000)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 df_null = pd.DataFrame(index=range(n_null_cases), columns=['Varexp. by Physio'])
 for i in tqdm(range(n_null_cases)):

@@ -5,7 +5,7 @@
 # 
 # This notebook contains the code used to generate Figure 1, which exemplifies how covariance-based FC behaves across echoes in the two extreme signal regimes
 
-# In[ ]:
+# In[1]:
 
 
 from utils.basics import PRCS_DATA_DIR, TES_MSEC
@@ -18,6 +18,7 @@ import holoviews as hv
 import panel as pn
 import holoviews as hv
 hv.extension("matplotlib")
+pn.extension()
 
 
 # ***
@@ -28,7 +29,7 @@ hv.extension("matplotlib")
 # 
 # First, we load real non-constant TR data (i.e., one random scan from the discovery dataset), with minimal pre-processing. This an example of non-BOLD dominated data
 
-# In[34]:
+# In[2]:
 
 
 sbj        = 'MGSBJ03'       # Subject ID 
@@ -41,7 +42,7 @@ te_labels  = {'e01':'TE1','e02':'TE2','e03':'TE3'}
 
 # ## 1.1. Load timeseries for all available TEs:
 
-# In[35]:
+# In[3]:
 
 
 roi_ts = {}
@@ -52,7 +53,7 @@ for te in tes:
 
 # ## 1.2. Compute the covariance matrix for all pairs of TEs:
 
-# In[36]:
+# In[4]:
 
 
 FC_c    = {}
@@ -71,7 +72,7 @@ for te_x in tes:
 # 1) ```x_data```: We load real FC_c for a pair of echoes (```(e01,e02)```)
 # 2) ```y_data```: Instead of loading FC_c for a second pair of echoes, we simulate the FC_c for that second pair of echoes by adding a bit of noise to the one loaded in 1.
 
-# In[37]:
+# In[5]:
 
 
 x_data            = FC_c[('e01','e02')]
@@ -85,14 +86,14 @@ y_data_label_plot =  r"$C(TE_{k},TE_{l})$"
 
 # Next, we load the two sets of FC_c into a single pandas dataframe for plotting purposes
 
-# In[38]:
+# In[6]:
 
 
 non_bold_sim_df = pd.DataFrame([x_data,y_data], 
                   index=[x_data_label, y_data_label]).T
 
 
-# In[39]:
+# In[7]:
 
 
 non_bold_sim_scatter = non_bold_sim_df.hvplot.scatter(x=x_data_label,y=y_data_label, 
@@ -111,7 +112,7 @@ non_bold_sim_scatter = non_bold_sim_df.hvplot.scatter(x=x_data_label,y=y_data_la
 # 
 # In this case we load real data for both the x and y axis of the plot
 
-# In[40]:
+# In[8]:
 
 
 x_data            = FC_c[('e01','e02')]
@@ -123,14 +124,14 @@ y_data_label      = f"C({te_labels['e01']},{te_labels['e03']})"
 y_data_label_plot =  r"$C( TE_{1},TE_{3})$"
 
 
-# In[41]:
+# In[9]:
 
 
 non_bold_real_df = pd.DataFrame([x_data,y_data], 
                                 index=[x_data_label, y_data_label]).T
 
 
-# In[42]:
+# In[10]:
 
 
 non_bold_real_scatter = (
@@ -154,7 +155,7 @@ non_bold_real_scatter = (
 # # 1.5 Generate additional graphic elements for Panels (a) and (b)
 # First, we create the reference axes for (0,0)
 
-# In[43]:
+# In[11]:
 
 
 zero_marker = (
@@ -167,7 +168,7 @@ zero_marker = (
 # 
 # This is the expected behavior for the non-BOLD dominant regime
 
-# In[44]:
+# In[12]:
 
 
 non_BOLD_line = hv.Slope(1, 0).opts(color="red", linestyle="dashed", linewidth=2)
@@ -186,7 +187,7 @@ def add_nonbold_label(plot, element):
 
 # Third, we compose the individual panels by adding the non_BOLD_line and the zero marker to each of the scatter plot
 
-# In[45]:
+# In[13]:
 
 
 non_bold_sim_panel  = (non_bold_sim_scatter  * zero_marker * non_BOLD_line).opts(hooks=[add_nonbold_label])
@@ -195,7 +196,7 @@ non_bold_real_panel = (non_bold_real_scatter * zero_marker * non_BOLD_line).opts
 
 # Forth, we generate the top banner signaling these are results for the non-BOLD dominated scenario
 
-# In[46]:
+# In[14]:
 
 
 non_bold_banner = pn.pane.HTML(
@@ -225,7 +226,7 @@ non_bold_banner = pn.pane.HTML(
 # 
 # This is an example of BOLD dominated data
 
-# In[47]:
+# In[15]:
 
 
 sbj='MGSBJ03'
@@ -235,7 +236,7 @@ scenario   = 'ALL_Tedana-fastica'
 
 # ## 2.1. Load timeseries for all available TEs:
 
-# In[48]:
+# In[16]:
 
 
 roi_ts = {}
@@ -246,7 +247,7 @@ for te in tes:
 
 # ## 2.2. Compute the covariance matrix for all pairs of TEs:
 
-# In[49]:
+# In[17]:
 
 
 FC_c    = {}
@@ -265,7 +266,7 @@ for te_x in tes:
 # 1) ```x_data```: We load real FC_c for a pair of echoes (```(e01,e02)```)
 # 2) ```y_data```: Instead of loading FC_c for a second pair of echoes, we simulate the FC_c for that second pair of echoes by adding a bit of noise to the one loaded in 1.
 
-# In[50]:
+# In[18]:
 
 
 # Compute slope for BOLD dominated behavior
@@ -285,14 +286,14 @@ y_data_label_plot =  r"$C(TE_{k},TE_{l})$"
 
 # Next, we load the two sets of FC_c into a single pandas dataframe for plotting purposes
 
-# In[51]:
+# In[19]:
 
 
 bold_sim_df = pd.DataFrame([x_data,y_data], 
                   index=[x_data_label,y_data_label]).T
 
 
-# In[52]:
+# In[20]:
 
 
 bold_sim_scatter = (
@@ -317,7 +318,7 @@ bold_sim_scatter = (
 # 
 # In this case we load real data for both the x and y axis of the plot
 
-# In[53]:
+# In[21]:
 
 
 x_data       = FC_c[('e01','e02')]
@@ -329,14 +330,14 @@ y_data_label = f"C({te_labels['e02']},{te_labels['e03']})"
 y_data_label_plot =  r"$C( TE_{1},TE_{3})$"
 
 
-# In[54]:
+# In[22]:
 
 
 bold_real_df = pd.DataFrame([x_data,y_data], 
                                 index=[x_data_label, y_data_label]).T
 
 
-# In[55]:
+# In[23]:
 
 
 bold_real_scatter = (
@@ -361,7 +362,7 @@ bold_real_scatter = (
 # 
 # First, we create the reference axes for (0,0)
 
-# In[56]:
+# In[24]:
 
 
 zero_marker = (
@@ -372,7 +373,7 @@ zero_marker = (
 
 # Second, we create the BOLD line and the text annotations.
 
-# In[57]:
+# In[25]:
 
 
 non_BOLD_line = hv.Slope(1, 0).opts(color="red", linestyle="dashed", linewidth=2)
@@ -412,7 +413,7 @@ BOLD_line = hv.Slope(slope,0).opts(color='g',linestyle='dashed',linewidth=2)
 
 # Third, we compose the individual panels by adding the non_BOLD_line and the zero marker to each of the scatter plot
 
-# In[58]:
+# In[26]:
 
 
 bold_sim_panel  = (bold_sim_scatter  * zero_marker * non_BOLD_line * BOLD_line).opts(hooks=[add_bold_sim_label])
@@ -421,7 +422,7 @@ bold_real_panel = (bold_real_scatter * zero_marker * non_BOLD_line * BOLD_line).
 
 # Forth, we generate the banner signaling these plots corresponds to BOLD-dominated scenarios
 
-# In[59]:
+# In[27]:
 
 
 bold_banner = pn.pane.HTML(
@@ -446,15 +447,15 @@ bold_banner = pn.pane.HTML(
 # ***
 # # 3. Compose Final Figure
 
-# In[60]:
+# In[28]:
 
 
 figure01 = pn.Row(pn.Column(non_bold_banner,pn.Row(non_bold_sim_panel,non_bold_real_panel), width=1000),
        pn.Column(bold_banner,    pn.Row(bold_sim_panel,bold_real_panel), width=1000))
 
 
-# In[61]:
+# Here is the figure!!!
+# 
+# ![figure01](figures/pBOLD_Figure01.png)
 
-
-figure01
-
+# 

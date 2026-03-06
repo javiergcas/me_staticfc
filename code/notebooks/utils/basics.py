@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from itertools import combinations_with_replacement, combinations
 import statsmodels.api as sm
+import math
 
 PRJ_DIR       = '/data/SFIMJGC_HCP7T/BCBL2024/'
 ATLAS_NAME    = 'Schaefer2018_400Parcels_17Networks'
@@ -161,7 +162,50 @@ def chord_distance_between_intersecting_lines(m1, m2, r=1.0):
 #     weighted_pref2 = (w * pref2).sum()
 #     frac_line2 = weighted_pref2 / (total_weight + 1e-16)
 #     return frac_line1,frac_line2
-    
+
+def line_circle_intersection(m, b, r=1.0):
+    """
+    Find the coordinates where the line y = m*x + b intersects
+    the circle x^2 + y^2 = r^2 in the positive quadrant.
+
+    Args:
+        m (float): slope of the line
+        b (float): intercept of the line
+        r (float): radius of the circle (default = 1)
+
+    Returns:
+        (x, y) if an intersection exists in Q1
+        None if no such intersection exists
+    """
+    # Quadratic coefficients: (1+m^2)x^2 + 2mb x + (b^2 - r^2) = 0
+    A = 1 + m**2
+    B = 2 * m * b
+    C = b**2 - r**2
+
+    # Discriminant
+    D = B**2 - 4*A*C
+    if D < 0:
+        return None  # no real intersection
+
+    sqrtD = math.sqrt(D)
+
+    # Two possible solutions for x
+    x1 = (-B + sqrtD) / (2*A)
+    x2 = (-B - sqrtD) / (2*A)
+
+    # Corresponding y
+    y1 = m * x1 + b
+    y2 = m * x2 + b
+
+    candidates = [(x1, y1), (x2, y2)]
+
+    # Return the one in the positive quadrant
+    for (x, y) in candidates:
+        if x >= 0 and y >= 0:
+            return (x, y)
+
+    return None  # no intersection in Q1
+
 # Alternative metrics
 def angdiff(a, b):
     """Smallest signed angle difference a-b in [-pi, pi]."""
@@ -392,7 +436,6 @@ def read_gen_ss_review_table(file_path):
     return df
 
 # QA-related functions
-
 
 
 def softmax(x, substract_max=False):

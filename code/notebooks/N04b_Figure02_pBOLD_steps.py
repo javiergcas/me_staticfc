@@ -5,7 +5,7 @@
 # 
 # This notebook can be used to generate Figure 02 in the accompanying publication. This figure contains information about how pBOLD is computed given a multi-echo dataset.
 
-# In[76]:
+# In[ ]:
 
 
 import pandas as pd
@@ -15,6 +15,7 @@ import os.path as osp
 import os
 from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR, TES_MSEC
+from utils.basics import power264_nw_cmap
 from utils.fc_matrices import hvplot_fc
 import matplotlib.colors as mcolors
 
@@ -50,14 +51,6 @@ Ncons = int(((Nrois) * (Nrois-1))/2)
 
 print('++ INFO: Number of ROIs = %d | Number of Connections = %d' % (Nrois,Ncons))
 roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']).index
-
-
-# Create a dictionary to be used as colormap when plotting FC matrices
-
-# In[78]:
-
-
-power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0] for nw in list(roi_info_df['Network'].unique())}
 
 
 # ***

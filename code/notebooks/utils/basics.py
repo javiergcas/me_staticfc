@@ -5,29 +5,34 @@ from itertools import combinations_with_replacement, combinations
 import statsmodels.api as sm
 import math
 
-PRJ_DIR       = '/data/SFIMJGC_HCP7T/BCBL2024/'
-ATLAS_NAME    = 'Schaefer2018_400Parcels_17Networks'
+# Project folders of interest and file information
+# ================================================
+PRJ_DIR       = '/data/SFIMJGC_HCP7T/BCBL2024/'       # Project folder
+ATLAS_NAME    = 'Schaefer2018_400Parcels_17Networks'  # Parcellation used in this project
 
-PRCS_DATA_DIR   = osp.join(PRJ_DIR,'prcs_data')
-ATLASES_DIR     = osp.join(PRJ_DIR,'atlases')
-CODE_DIR        = osp.join(PRJ_DIR,'me_staticfc','code')
-DOWNLOAD_DIRS   = {'evaluation':osp.join(PRJ_DIR,'openeuro','des003592-download'),
-                   'discovery':osp.join(PRJ_DIR,'openeuro','meica_eval')}
+PRCS_DATA_DIR   = osp.join(PRJ_DIR,'prcs_data')          # Folder where pre-processed data resides
+ATLASES_DIR     = osp.join(PRJ_DIR,'atlases')            # Folder where atlases (original and modified) reside
+CODE_DIR        = osp.join(PRJ_DIR,'me_staticfc','code') # Folder with scripts, programs and notebooks
+DOWNLOAD_DIRS   = {'evaluation':osp.join(PRJ_DIR,'openeuro','des003592-download'), # Location of the Spreng dataset (as originally downloaded)
+                   'discovery':osp.join(PRJ_DIR,'openeuro','meica_eval')}          # Location of the previously publised multi-echo, cardiac gated dataset
 
-TES_MSEC = {'discovery':{'e01':13.9,'e02':31.7, 'e03':49.5},
-            'evaluation':{'e01':13.7,'e02':30,'e03':47},}
-FMRI_TRS={'discovery':'2.5s',
-     'evaluation':'3s'}
+TES_MSEC = {'discovery':{'e01':13.9,'e02':31.7, 'e03':49.5},   # Echo Times for the discovery dataset in msec
+            'evaluation':{'e01':13.7,'e02':30,'e03':47},}      # Echo Times for the evaluation dataset in msec
+FMRI_TRS={'discovery':'2.5s',   # Repetion Time for the discovery dataset
+     'evaluation':'3s'}         # Repetition Time for the evaluation dataset
 
-FMRI_FINAL_NUM_SAMPLES={'discovery':192,
-                        'evaluation':201}
+FMRI_FINAL_NUM_SAMPLES={'discovery':192,   # Number of TRs after initial volume discarding in the discovery dataset
+                        'evaluation':201}  # Number of TRs after initial volume discarding in the evaluation dataset
 
-NUM_DISCARDED_VOLUMES = {'discovery':3.0,
-                         'evaluation':3.0}
+NUM_DISCARDED_VOLUMES = {'discovery':3.0,  # Number of discarded volumes in the discovery dataset
+                         'evaluation':3.0} # Number of discarded volumes in the evaluation dataset
 
-SESSIONS = {'discovery':['constant_gating','cardiac_gating'],
-            'evaluation':['ses-1','ses-2']}
+SESSIONS = {'discovery':['constant_gating','cardiac_gating'],  # Sessions in the discovery dataset
+            'evaluation':['ses-1','ses-2']}                    # Sessions in the evaluation dataset
 
+
+# List of unique echo time pairs and quadruples
+# =============================================
 echo_pairs_tuples   = [i for i in combinations_with_replacement(['e01','e02','e03'],2)]
 echo_pairs          = [('|').join(i) for i in echo_pairs_tuples]
 pairs_of_echo_pairs = ['|'.join((e_x[0],e_x[1]))+'_vs_'+'|'.join((e_y[0],e_y[1])) for e_x,e_y in combinations(echo_pairs_tuples,2)]
@@ -35,14 +40,11 @@ pairs_of_echo_pairs = ['|'.join((e_x[0],e_x[1]))+'_vs_'+'|'.join((e_y[0],e_y[1])
 LABEL_MAPPING = {'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana','ALL_NoRegression':'No Regression',
                  'KILL_Basic':'Basic w/ censoring','KILL_GS':'GSR w/ censoring','KILL_Tedana-fastica':'Tedana w/censoring','KILL_NoRegression':'No Regression w/censoring',
                  'NORDIC':'on'}
-# Echo Time information for the Spreng Dataset
-#TES_MSEC_PER_SCANNER = {'1':{'e01':13.7,'e02':30,'e03':47},
-#                        '2':{'e01':14,'e02':29.96,'e03':45.92}}
-#
-# We are only working with data from Site 1
-#TES_MSEC = TES_MSEC_PER_SCANNER['1']
 
-Power264_cmap = {''}
+# Colormap for networks associated with the Power 264 atlas
+# =========================================================
+power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0] for nw in list(roi_info_df['Network'].unique())}
+
 
 def get_dataset_index(dataset, verbose=True):
     if dataset == 'discovery':

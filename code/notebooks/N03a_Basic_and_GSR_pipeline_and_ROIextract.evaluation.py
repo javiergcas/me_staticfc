@@ -51,7 +51,7 @@
 # 
 # ***
 
-# In[1]:
+# In[ ]:
 
 
 import pandas as pd
@@ -60,7 +60,7 @@ import os.path as osp
 import datetime
 from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR
-from utils.basics import get_dataset_index
+from utils.basics import get_dataset_index, power264_nw_cmap
 from sfim_lib.io.afni import load_netcc
 from sfim_lib.plotting.fc_matrices import hvplot_fc
 
@@ -201,14 +201,6 @@ roi_info_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv')
 roi_info_df   = pd.read_csv(roi_info_path)
 print(roi_info_path)
 print(roi_info_df.shape)
-
-
-# Create a colormap with a different color per network
-
-# In[17]:
-
-
-power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0] for nw in list(roi_info_df['Network'].unique())}
 
 
 # Load the within-echo FC matrices into a single xr.DataArray object

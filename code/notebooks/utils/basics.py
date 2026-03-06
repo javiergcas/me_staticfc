@@ -45,8 +45,15 @@ LABEL_MAPPING = {'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana
 # =========================================================
 power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0] for nw in list(roi_info_df['Network'].unique())}
 
+# ====================================================================================================================================================
 
+# Function to get list of scans available in each dataset
+# -------------------------------------------------------
 def get_dataset_index(dataset, verbose=True):
+    """
+    Input: dataset ID
+    Output: multiindex with sbj and sess as levels
+    """
     if dataset == 'discovery':
         sbj_list = ['MGSBJ01',  'MGSBJ02',  'MGSBJ03',  'MGSBJ04',  'MGSBJ05',  'MGSBJ06',  'MGSBJ07']
         ses_list = ['constant_gated', 'cardiac_gated']
@@ -63,8 +70,9 @@ def get_dataset_index(dataset, verbose=True):
         print('++ Number of subjects = %d' % out.get_level_values('Subject').get_level_values('Subject').unique().shape[0])
     return out
 
-# pBOLD-related functions
-# ========================
+# ===============================
+#      pBOLD-related functions
+# ===============================
 def compute_residuals(x, y, m, b):
     """Compute residuals after projection onto the line y = mx + b."""
     x_p, y_p = project_points(x, y, m, b)
@@ -137,33 +145,6 @@ def chord_distance_between_intersecting_lines(m1, m2, r=1.0):
     # Euclidean distance between the points
     distance = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
     return distance
-# def mse_dist(points,m1,m2,weight_fn=None, max_weight=None,tol = 1e-12):
-#     x  = points[:,0]; y = points[:,1]
-#     pd1 = compute_residuals(x,y,m1,0.0)
-#     pd2 = compute_residuals(x,y,m2,0.0)
-#     r  = np.sqrt(x**2 + y**2)
-#     if weight_fn is None:
-#         weight_fn = lambda r: r   # linear weight by radius
-#     w = weight_fn(r)
-#     if max_weight is not None:
-#         w = np.minimum(max_weight,w)
-#     total_weight = w.sum()
-
-#     # Line 1
-#     pref1 = (pd1 < pd2).astype(float)
-#     ties = np.isclose(pd1, pd2, atol=tol)
-#     pref1[ties] = 0.5
-#     weighted_pref1 = (w * pref1).sum()
-#     frac_line1 = weighted_pref1 / (total_weight + 1e-16)
-
-#     # Line 2
-#     pref2 = (pd1 > pd2).astype(float)
-#     tol = 1e-12
-#     ties = np.isclose(pd1, pd2, atol=tol)
-#     pref2[ties] = 0.5
-#     weighted_pref2 = (w * pref2).sum()
-#     frac_line2 = weighted_pref2 / (total_weight + 1e-16)
-#     return frac_line1,frac_line2
 
 def line_circle_intersection(m, b, r=1.0):
     """
@@ -208,152 +189,8 @@ def line_circle_intersection(m, b, r=1.0):
 
     return None  # no intersection in Q1
 
-# Alternative metrics
-def angdiff(a, b):
-    """Smallest signed angle difference a-b in [-pi, pi]."""
-    d = a - b
-    d = (d + np.pi) % (2*np.pi) - np.pi
-    return d
-
-def ang_dist(points,m1,m2,weight_fn=None, max_weight=None,tol = 1e-12):
-    """
-    points: (N,2) array of (x,y)
-    m1, m2: slopes of the two lines through origin
-    weight_fn: function r -> weight (if None uses w = r)
-    returns: dict with weighted counts / fraction preferring line1
-    """
-    x = points[:,0]; y = points[:,1]
-    theta = np.arctan2(y, x)
-    r = np.sqrt(x**2 + y**2)
-    if weight_fn is None:
-        weight_fn = lambda r: r   # linear weight by radius
-    w = weight_fn(r)
-    if max_weight is not None:
-        w = np.minimum(max_weight,w)
-    total_weight = w.sum()
-    
-    phi1 = np.arctan(m1)
-    phi2 = np.arctan(m2)
-    d1 = np.abs(angdiff(theta, phi1))
-    d2 = np.abs(angdiff(theta, phi2))
-    
-    # Line 1
-    pref1 = (d1 < d2).astype(float)
-    ties = np.isclose(d1, d2, atol=tol)
-    pref1[ties] = 0.5
-    weighted_pref1 = (w * pref1).sum()
-    frac_line1 = weighted_pref1 / (total_weight + 1e-16)
-
-    # Line 1
-    pref2 = (d1 > d2).astype(float)
-    ties = np.isclose(d1, d2, atol=tol)
-    pref2[ties] = 0.5
-    weighted_pref2 = (w * pref2).sum()
-    frac_line2 = weighted_pref2 / (total_weight + 1e-16)
-    return frac_line1, frac_line2
-
-    
-    
-# def weighted_line_preference(points, m1, m2, weight_fn=None):
-#     """
-#     points: (N,2) array of (x,y)
-#     m1, m2: slopes of the two lines through origin
-#     weight_fn: function r -> weight (if None uses w = r)
-#     returns: dict with weighted counts / fraction preferring line1
-#     """
-#     x = points[:,0]; y = points[:,1]
-#     theta = np.arctan2(y, x)
-#     r = np.sqrt(x**2 + y**2)
-#     if weight_fn is None:
-#         weight_fn = lambda r: r   # linear weight by radius
-#     w = weight_fn(r)
-#     phi1 = np.arctan(m1)
-#     phi2 = np.arctan(m2)
-#     d1 = np.abs(angdiff(theta, phi1))
-#     d2 = np.abs(angdiff(theta, phi2))
-#     # prefer the line with smaller angular error
-#     pref1 = (d1 < d2).astype(float)
-#     # tie-breaker: if equal within tolerance, split 0.5
-#     tol = 1e-12
-#     ties = np.isclose(d1, d2, atol=tol)
-#     pref1[ties] = 0.5
-#     weighted_pref1 = (w * pref1).sum()
-#     total_weight = w.sum()
-#     frac_line1 = weighted_pref1 / (total_weight + 1e-16)
-#     return {
-#         'd1':d1,
-#         'd2':d2,
-#         'frac_line1': frac_line1,
-#         'weighted_pref1': weighted_pref1,
-#         'total_weight': total_weight,
-#         'per_point_weights': w,
-#         'per_point_pref1': pref1
-#     }
-
-def em_angle_mixture(points, m1, m2, max_iter=100, tol=1e-6, weight_fn=None):
-    """
-    EM for a 2-component mixture on angles with weights based on radius.
-    Returns responsibilities (probability of belonging to component 1),
-    and estimated mixing proportion pi, sigmas.
-    """
-    x = points[:,0]; y = points[:,1]
-    theta = np.arctan2(y, x)
-    r = np.sqrt(x**2 + y**2)
-    if weight_fn is None:
-        weight_fn = lambda r: r
-    w = weight_fn(r)
-    phi1 = np.arctan(m1)
-    phi2 = np.arctan(m2)
-    N = len(theta)
-    # init responsibilities by hard weighted preference
-    d1 = np.abs(angdiff(theta, phi1)); d2 = np.abs(angdiff(theta, phi2))
-    resp1 = (d1 < d2).astype(float)
-    # small random jitter to avoid degeneracy
-    resp1 = resp1 * 0.9 + 0.1 * np.random.rand(N)
-    pi = resp1.mean()
-    # initialize sigmas:
-    def weighted_var(diff, rts):
-        return np.sqrt((rts * (diff**2)).sum() / (rts.sum() + 1e-16))
-    sigma1 = weighted_var(angdiff(theta, phi1), w * resp1)
-    sigma2 = weighted_var(angdiff(theta, phi2), w * (1-resp1))
-    sigma1 = max(sigma1, 1e-3); sigma2 = max(sigma2, 1e-3)
-
-    for it in range(max_iter):
-        # E-step: compute weighted Gaussian likelihoods
-        # p ~ exp(-0.5 * w * (diff/sigma)^2)  (w acts like precision scaling)
-        a1 = -0.5 * w * (angdiff(theta, phi1)**2) / (sigma1**2)
-        a2 = -0.5 * w * (angdiff(theta, phi2)**2) / (sigma2**2)
-        # to avoid underflow, shift
-        A = np.vstack([a1, a2])
-        A = A - A.max(axis=0)
-        lik1 = np.exp(A[0])
-        lik2 = np.exp(A[1])
-        # responsibilities
-        numer1 = pi * lik1
-        numer2 = (1-pi) * lik2
-        denom = numer1 + numer2 + 1e-16
-        new_resp1 = numer1 / denom
-        # M-step
-        new_pi = new_resp1.mean()
-        # update sigmas using weighted residuals
-        s1 = weighted_var(angdiff(theta, phi1), w * new_resp1)
-        s2 = weighted_var(angdiff(theta, phi2), w * (1-new_resp1))
-        # stabilize
-        s1 = max(s1, 1e-6); s2 = max(s2, 1e-6)
-        # check convergence
-        if np.abs(new_pi - pi) < tol and np.abs(s1 - sigma1) < tol and np.abs(s2 - sigma2) < tol:
-            pi, sigma1, sigma2, resp1 = new_pi, s1, s2, new_resp1
-            break
-        pi, sigma1, sigma2, resp1 = new_pi, s1, s2, new_resp1
-
-    return {
-        'pi': pi,                 # mixing proportion for line1
-        'sigma1': sigma1,
-        'sigma2': sigma2,
-        'resp1': resp1,           # per-point P(component=1)
-        'weights': w
-    }
-
+# Signal Processing Functions
+# ===========================
 
 def detrend_signal(y):
     """
@@ -364,6 +201,8 @@ def detrend_signal(y):
     y_detrended = sm.OLS(y, trend).fit().resid
     return y_detrended
 
+# AFNI IO Functions
+# =================
 def read_group_physio_reports(path):
     """
     Reads the output of command gen_ss_review_table when
@@ -436,22 +275,3 @@ def read_gen_ss_review_table(file_path):
             df[c] = df[c]
     print("++ INFO [read_gen_ss_review_table]: Number of scans = %d | Number of metrics per scan = %d" % (df.shape))
     return df
-
-# QA-related functions
-
-
-def softmax(x, substract_max=False):
-  """
-  Computes the softmax function for a given input vector x.
-
-  Args:
-    x: A NumPy array representing the input vector.
-
-  Returns:
-    A NumPy array representing the softmax output.
-  """
-  if substract_max:
-      exp_x = np.exp(x - np.max(x)) # Subtracting max(x) for numerical stability
-  else:
-      exp_x = np.exp(x)
-  return exp_x / np.sum(exp_x)

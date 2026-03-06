@@ -30,7 +30,7 @@ from nilearn.connectome import sym_matrix_to_vec
 # In[ ]:
 
 
-from utils.basics import compute_residuals, echo_pairs, pairs_of_echo_pairs, echo_pairs_tuples, get_dataset_index, power264_nw_cmap
+from utils.basics import compute_residuals, echo_pairs, pairs_of_echo_pairs, echo_pairs_tuples, get_dataset_index, get_altas_info
 from utils.basics import TES_MSEC
 from utils.basics import ATLASES_DIR, PRCS_DATA_DIR, PRJ_DIR, FMRI_FINAL_NUM_SAMPLES, FMRI_TRS, NUM_DISCARDED_VOLUMES, DOWNLOAD_DIRS
 from utils.basics import mse_dist, chord_distance_between_intersecting_lines, read_group_physio_reports
@@ -126,17 +126,10 @@ ATLAS_NAME = f'Power264-{DATASET}'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
 
-# In[14]:
+# In[ ]:
 
 
-roi_info_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv')
-roi_info_df   = pd.read_csv(roi_info_path)
-roi_info_df.head(5)
-
-Nrois = roi_info_df.shape[0]
-Ncons = int(((Nrois) * (Nrois-1))/2)
-
-print('++ INFO: Number of ROIs = %d | Number of Connections = %d' % (Nrois,Ncons))
+roi_info_df, power264_nw_cmap = get_altas_info(ATLAS_DIR,ATLAS_NAME)
 roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']).index
 
 

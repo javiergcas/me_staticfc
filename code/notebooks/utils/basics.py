@@ -43,7 +43,19 @@ LABEL_MAPPING = {'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana
 
 # Colormap for networks associated with the Power 264 atlas
 # =========================================================
-power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0] for nw in list(roi_info_df['Network'].unique())}
+def get_altas_info(ATLAS_DIR, ATLAS_NAME):
+    roi_info_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv')
+    print("++ INFO [get_nw_cmap]: Gathering ROI information from file %s" % roi_info_path)
+    roi_info_df   = pd.read_csv(roi_info_path)
+    roi_info_df.head(5)
+
+    Nrois = roi_info_df.shape[0]
+    Ncons = int(((Nrois) * (Nrois-1))/2)
+
+    print('++ INFO: Number of ROIs = %d | Number of Connections = %d' % (Nrois,Ncons))
+
+    cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0] for nw in list(roi_info_df['Network'].unique())}
+    return roi_info_df, cmap
 
 # ====================================================================================================================================================
 

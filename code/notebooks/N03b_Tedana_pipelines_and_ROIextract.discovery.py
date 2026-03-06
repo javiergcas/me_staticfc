@@ -14,7 +14,7 @@
 # * Computes TSNR map
 # 
 
-# In[26]:
+# In[ ]:
 
 
 import pandas as pd
@@ -23,7 +23,7 @@ import os.path as osp
 import datetime
 import os
 from tqdm import tqdm
-from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, ATLAS_NAME, PRJ_DIR, CODE_DIR, get_dataset_index
+from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, ATLAS_NAME, PRJ_DIR, CODE_DIR, get_dataset_index, get_altas_info
 
 
 # Obtain current user name. We use this to compose SWARM file and log folder paths
@@ -134,19 +134,11 @@ from sfim_lib.plotting.fc_matrices import hvplot_fc
 
 # Load information about the ROIs in the ATLAS. This is needed for plotting purposes.
 
-# In[12]:
+# In[ ]:
 
 
-roi_info_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv')
-roi_info_df   = pd.read_csv(roi_info_path)
-
-
-# Create a colormap that will assign a different color to each network
-
-# In[13]:
-
-
-power264_nw_cmap = {nw:roi_info_df.set_index('Network').loc[nw]['RGB'].values[0] for nw in list(roi_info_df['Network'].unique())}
+roi_info_df, power264_nw_cmap = get_altas_info(ATLAS_DIR,ATLAS_NAME)
+roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']).index
 
 
 # Create an xr.DataArray that will hold the within echo FC matrices for all scans in all pipelines.

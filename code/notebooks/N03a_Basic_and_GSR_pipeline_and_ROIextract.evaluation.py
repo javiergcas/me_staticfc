@@ -60,7 +60,7 @@ import os.path as osp
 import datetime
 from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR
-from utils.basics import get_dataset_index, power264_nw_cmap
+from utils.basics import get_dataset_index, get_altas_info
 from sfim_lib.io.afni import load_netcc
 from sfim_lib.plotting.fc_matrices import hvplot_fc
 
@@ -194,13 +194,11 @@ import panel as pn
 
 # Load information about the ATLAS: ROI names, hemisphere, etc... This is used when plotting FC matrices
 
-# In[16]:
+# In[ ]:
 
 
-roi_info_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv')
-roi_info_df   = pd.read_csv(roi_info_path)
-print(roi_info_path)
-print(roi_info_df.shape)
+roi_info_df, power264_nw_cmap = get_altas_info(ATLAS_DIR,ATLAS_NAME)
+roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']).index
 
 
 # Load the within-echo FC matrices into a single xr.DataArray object

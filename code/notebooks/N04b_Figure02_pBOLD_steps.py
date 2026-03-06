@@ -5,7 +5,7 @@
 # 
 # This notebook can be used to generate Figure 02 in the accompanying publication. This figure contains information about how pBOLD is computed given a multi-echo dataset.
 
-# In[ ]:
+# In[1]:
 
 
 import pandas as pd
@@ -15,7 +15,7 @@ import os.path as osp
 import os
 from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR, TES_MSEC
-from utils.basics import power264_nw_cmap
+from utils.basics import get_altas_info
 from utils.fc_matrices import hvplot_fc
 import matplotlib.colors as mcolors
 
@@ -39,17 +39,10 @@ echo_times_dict = TES_MSEC['discovery']
 # 
 # This is needed to plot the two connectivity matrices in panels (a) and (b)
 
-# In[77]:
+# In[2]:
 
 
-roi_info_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv')
-roi_info_df   = pd.read_csv(roi_info_path)
-roi_info_df.head(5)
-
-Nrois = roi_info_df.shape[0]
-Ncons = int(((Nrois) * (Nrois-1))/2)
-
-print('++ INFO: Number of ROIs = %d | Number of Connections = %d' % (Nrois,Ncons))
+roi_info_df, power264_nw_cmap = get_altas_info(ATLAS_DIR,ATLAS_NAME)
 roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']).index
 
 
@@ -58,7 +51,7 @@ roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']
 # 
 # We will use a low motion and aggresively pre-processed scan for explanatory purposes.
 
-# In[79]:
+# In[3]:
 
 
 sbj = 'MGSBJ05'
@@ -66,7 +59,7 @@ ses = 'constant_gated'
 scenario = 'ALL_Tedana-fastica'
 
 
-# In[80]:
+# In[4]:
 
 
 fc={}
@@ -82,7 +75,7 @@ for (e_x,e_y) in echo_pairs_tuples:
     fc[(e_x,e_y)]  = pd.DataFrame(aux_c,index=roi_idxs,columns=roi_idxs)
 
 
-# In[81]:
+# In[5]:
 
 
 from utils.basics import compute_residuals, project_points
@@ -92,7 +85,7 @@ x_te1,x_te2    = 'e01','e02'
 y_te1,y_te2    = 'e02','e03'
 
 
-# In[82]:
+# In[6]:
 
 
 # Get Connectivity data: top triangle of the FC-C matrix
@@ -103,7 +96,7 @@ x = df['C(TEi,TEj)'].values
 y = df['C(TEk,TEl)'].values
 
 
-# In[83]:
+# In[7]:
 
 
 data        = fc[(x_te1,x_te2)]
@@ -123,7 +116,7 @@ pn.Row(plot_fc_x,plot_fc_y).save('./figures/pBOLD_Figure02_ab.html')
 
 # Next, we plot panel (c), which is a scatter plot of the top triangle of these two FC_c matrices against each other
 
-# In[84]:
+# In[8]:
 
 
 # Create basic graphic elements: zero point, BOLD line, non-BOLD line, basic scatter, etc.
@@ -145,7 +138,7 @@ pn.Row(zero_point * fcc_scat_overlap).save('./figures/pBOLD_Figure02_c.html')
 # 
 # We first define the line that exemplifies expected behavior when data in dominated by non-BOLD effects (slope = 1, intercept=0)
 
-# In[85]:
+# In[9]:
 
 
 So_slope     = 1.0
@@ -154,7 +147,7 @@ nonBOLD_line = hv.Slope(1,0).opts(line_width=3, line_color='r', line_dash='dashe
 
 # Next, we define the line that exemplifies the behavior when data is dominated by BOLD effects (slope = f(contributing echoes), intercept=0)
 
-# In[86]:
+# In[10]:
 
 
 BOLD_slope = (echo_times_dict[y_te1]*echo_times_dict[y_te2])/(echo_times_dict[x_te1]*echo_times_dict[x_te2])
@@ -163,7 +156,7 @@ BOLD_line  = hv.Slope(BOLD_slope,0).opts(line_width=3, line_color='g', line_dash
 
 # Third, we select a connection (one dot on the scatter plot) in the vicinity of 0.15, 0.25. This is a good location for illustrative purposes becuase it sits in between both BOLD and non-BODL lines
 
-# In[87]:
+# In[11]:
 
 
 # Let's select a representative connection
@@ -187,7 +180,7 @@ print(closest_row, sample_x, sample_y)
 
 # Forth, we compute the location of this connection when projected over the non-BOLD line, as well as the segment joining the connection and its non-BOLD projection
 
-# In[88]:
+# In[12]:
 
 
 proj_on_So_line             = project_points(sample_x,sample_y,So_slope,0.0)
@@ -197,7 +190,7 @@ proj_on_So_residual_segment = hv.Path([[(sample_x,sample_y), proj_on_So_line]]).
 
 # Fifth, we put all the elements together to generate Panel d
 
-# In[89]:
+# In[13]:
 
 
 panel_d = pn.Row((fcc_scat_overlap * zero_point) * BOLD_line * nonBOLD_line * sample_point * proj_on_So_line_point * proj_on_So_residual_segment)
@@ -205,13 +198,13 @@ panel_d = pn.Row((fcc_scat_overlap * zero_point) * BOLD_line * nonBOLD_line * sa
 
 # Panel e shows the same information as panel d, except that connections are colored according to their distance to the So line. To generate this additional panel, we need to compute these distances and add then to the pandas Dataframe
 
-# In[90]:
+# In[14]:
 
 
 df['dSo'] = compute_residuals(df["C(TEi,TEj)"].values,df["C(TEk,TEl)"].values,1.0,0.0)
 
 
-# In[91]:
+# In[15]:
 
 
 fcc_scat_dSo   = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), frame_width=400,
@@ -225,7 +218,7 @@ fcc_scat_dSo   = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square
 panel_e = fcc_scat_dSo * zero_point * nonBOLD_line
 
 
-# In[92]:
+# In[16]:
 
 
 pn.Row(panel_d,panel_e).save('./figures/pBOLD_Figure02_de.html')
@@ -240,7 +233,7 @@ pn.Row(panel_d,panel_e).save('./figures/pBOLD_Figure02_de.html')
 # 
 # This is similar to the previous section, but the reference here is the line associated with BOLD dominated behavior (green line)
 
-# In[93]:
+# In[17]:
 
 
 proj_on_BOLD_line             = project_points(sample_x,sample_y,BOLD_slope,0.0)
@@ -248,19 +241,19 @@ proj_on_BOLD_line_point       = hv.Points(proj_on_BOLD_line).opts(size=10,color=
 proj_on_BOLD_residual_segment = hv.Path([[(sample_x,sample_y), proj_on_BOLD_line]]).opts(color="green", line_width=2)
 
 
-# In[94]:
+# In[18]:
 
 
 panel_f = pn.Row((fcc_scat_overlap * zero_point) * BOLD_line * nonBOLD_line * sample_point * proj_on_BOLD_line_point * proj_on_BOLD_residual_segment)
 
 
-# In[95]:
+# In[19]:
 
 
 df['dBOLD'] = compute_residuals(df["C(TEi,TEj)"].values,df["C(TEk,TEl)"].values,BOLD_slope,0.0)
 
 
-# In[96]:
+# In[20]:
 
 
 fcc_scat_dBOLD   = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), frame_width=400,
@@ -274,7 +267,7 @@ fcc_scat_dBOLD   = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='squa
 panel_g = fcc_scat_dBOLD * zero_point * BOLD_line
 
 
-# In[97]:
+# In[21]:
 
 
 pn.Row(panel_f,panel_g).save('./figures/pBOLD_Figure02_fg.html')
@@ -291,7 +284,7 @@ pn.Row(panel_f,panel_g).save('./figures/pBOLD_Figure02_fg.html')
 # 
 # First, we will generate panel h, which shows what BOLD preference value (-1 = Prefernece toward non-BOLD, 1 = Preference towards BOLD, 0.5 = Uncertain) is assigned to each connection.
 
-# In[98]:
+# In[22]:
 
 
 # Let's now see which line is the closest to each connection.
@@ -302,7 +295,7 @@ pref1[ties] = 0.5
 df['prefBOLD'] = pref1
 
 
-# In[99]:
+# In[23]:
 
 
 ticks = [0.25, 0.5, 0.75]
@@ -318,7 +311,7 @@ scat_colored_by_prefBOLD = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspe
                                                                                 "major_label_overrides": labels,}, toolbar=None)
 
 
-# In[100]:
+# In[24]:
 
 
 panel_h = scat_colored_by_prefBOLD * zero_point * BOLD_line * nonBOLD_line
@@ -330,7 +323,7 @@ panel_h = scat_colored_by_prefBOLD * zero_point * BOLD_line * nonBOLD_line
 # 
 # We also define a limit, to avoid giving excesive weigth to isolated connections with excessively high covariance values
 
-# In[101]:
+# In[25]:
 
 
 weight_fn     = lambda r: np.power(r,1.0)
@@ -339,7 +332,7 @@ max_weight_fn = lambda r: np.minimum(r,np.quantile(r,.95))
 
 # Estimating the distance to the origin is as simple as the sqaure root of the sum of the x and y coordinates squared.
 
-# In[102]:
+# In[26]:
 
 
 r  = np.sqrt(x**2 + y**2)
@@ -347,7 +340,7 @@ r  = np.sqrt(x**2 + y**2)
 
 # The next code applies the weight function (in this case it does nothing), and then the limiting function
 
-# In[103]:
+# In[27]:
 
 
 if weight_fn is None:
@@ -360,7 +353,7 @@ total_weight = w.sum()
 
 # We add the weights to a new column to our dataframe
 
-# In[104]:
+# In[28]:
 
 
 df['w'] = w
@@ -368,7 +361,7 @@ df['w'] = w
 
 # We are not ready to generate panel i, the scatter with the connections colored by the distance to the origin
 
-# In[105]:
+# In[29]:
 
 
 scat_colored_by_w = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', aspect='square', xlim=(-.1,.4), ylim=(-.1,.4), frame_width=400,
@@ -385,7 +378,7 @@ panel_i = scat_colored_by_w * zero_point * BOLD_line * nonBOLD_line
 
 # Finally, we multiply the original BOLD-line preference by our final weight values in order to obtain the weighted BOLD line preference for each connection.
 
-# In[106]:
+# In[30]:
 
 
 weighted_pref1 = (w * pref1)
@@ -393,7 +386,7 @@ frac_line1 = weighted_pref1
 df['w_prefBOLD'] = frac_line1
 
 
-# In[107]:
+# In[31]:
 
 
 # We create a continuous map that goes through the same colors used to plot the categorical preference values in oabel h 
@@ -412,7 +405,7 @@ scat_colored_by_wprefBOLD = df.hvplot.scatter(x='C(TEi,TEj)',y='C(TEk,TEl)', asp
 panel_j = scat_colored_by_wprefBOLD * zero_point * BOLD_line * nonBOLD_line
 
 
-# In[108]:
+# In[32]:
 
 
 pn.Row(panel_h,panel_i,panel_j).save('./figures/pBOLD_Figure02_hij.html')
@@ -432,7 +425,7 @@ pn.Row(panel_h,panel_i,panel_j).save('./figures/pBOLD_Figure02_hij.html')
 
 # First, we look at a case where the BOLD and non-BOLD lines are further apart
 
-# In[109]:
+# In[33]:
 
 
 # CASE 1:
@@ -459,7 +452,7 @@ panel_k = (fcc_scat_overlap.opts(colorbar=False) * BOLD_line * nonBOLD_line * ze
 
 # Second, we look at a case where both lines are more close to each other
 
-# In[110]:
+# In[34]:
 
 
 # CASE 2:
@@ -484,7 +477,7 @@ panel_l = (fcc_scat_overlap.opts(colorbar=False) * BOLD_line * nonBOLD_line * ze
                                                                                                                           ylabel=r"$$FC_{C}$$"+ "(%.1f,%.1f)"%(echo_times_dict[y_te1],echo_times_dict[y_te2]))
 
 
-# In[111]:
+# In[35]:
 
 
 pn.Row(panel_k,panel_l).save('./figures/pBOLD_Figure02_kl.html')

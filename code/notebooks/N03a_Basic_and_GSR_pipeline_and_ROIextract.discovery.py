@@ -50,7 +50,7 @@
 #     * This not done here, but on the next notebook.
 # ***
 
-# In[ ]:
+# In[1]:
 
 
 import pandas as pd
@@ -59,7 +59,7 @@ import os.path as osp
 import datetime
 from tqdm import tqdm
 from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR, get_dataset_index
-from utils.basics import power264_nw_cmap
+from utils.basics import get_altas_info
 from sfim_lib.io.afni import load_netcc
 from sfim_lib.plotting.fc_matrices import hvplot_fc
 
@@ -149,7 +149,7 @@ print(f'Swarm script written to: {script_path}')
 # 
 # To check if jobs run correctly, we check for the presence of one key output. This does not necessarily mean that a job run smoothly to the end, but it is a good way to find jobs that died inadvertently. This will have to be submited again.
 
-# In[11]:
+# In[8]:
 
 
 num_incomplete_jobs = 0
@@ -172,7 +172,7 @@ print(f'Number of incomplete jobs: {num_incomplete_jobs}')
 # 
 # ## 4.1 Load Motion information per scan
 
-# In[14]:
+# In[9]:
 
 
 FINAL_N_ACQS = 192
@@ -186,7 +186,7 @@ for sbj,ses in tqdm(list(ds_index)):
 # 
 # At this point, only within TE matrices (e.g., TE1_to_TE1, TE2_to_TE2, etc.) are available. No FC across echoes exists yet.
 
-# In[15]:
+# In[10]:
 
 
 import xarray as xr
@@ -195,18 +195,16 @@ import panel as pn
 
 # Load information about the ATLAS: ROI names, hemisphere, etc... This is used when plotting FC matrices
 
-# In[17]:
+# In[11]:
 
 
-roi_info_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv')
-roi_info_df   = pd.read_csv(roi_info_path)
-print(roi_info_path)
-print(roi_info_df.shape)
+roi_info_df, power264_nw_cmap = get_altas_info(ATLAS_DIR,ATLAS_NAME)
+roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']).index
 
 
 # Load the within-echo FC matrices into a single xr.DataArray object
 
-# In[20]:
+# In[12]:
 
 
 fcs = xr.DataArray(dims=['censor','scan','NORDIC','roi_x','roi_y'], 
@@ -216,7 +214,7 @@ fcs = xr.DataArray(dims=['censor','scan','NORDIC','roi_x','roi_y'],
                            'roi_x':list(roi_info_df['ROI_Name']),'roi_y':list(roi_info_df['ROI_Name'])})
 
 
-# In[21]:
+# In[13]:
 
 
 for sbj,ses in tqdm(list(ds_index)):
@@ -232,7 +230,7 @@ for sbj,ses in tqdm(list(ds_index)):
 # * Widget to select NORDIC status
 # * Function to plot the resulting FC matrix
 
-# In[22]:
+# In[14]:
 
 
 scan_select   = pn.widgets.Select(name='scan', options=list(fcs.coords['scan'].values))
@@ -251,7 +249,7 @@ def plot_fc(scan,NORDIC):
     return plot_basic + plot_gs
 
 
-# In[23]:
+# In[15]:
 
 
 @pn.depends(scan_select)
@@ -263,13 +261,13 @@ def plot_mot(scan):
     return aux_df.hvplot(width=1000,c='k')
 
 
-# In[25]:
+# In[ ]:
 
 
 dashboard = pn.Row(pn.Column(scan_select,NORDIC_select),pn.Column(plot_fc,plot_mot)).show()
 
 
-# In[26]:
+# In[17]:
 
 
 dashboard.stop()

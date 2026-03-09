@@ -165,118 +165,14 @@ scans_with_complete_physio = ds_index.drop(no_physio_scans + sbj_ses_physio_corr
 print("++ INFO: Number of scans for which we were able to complete physio_calc = %d scans" % len(scans_with_complete_physio))
 
 
-# ## 2.2 Check some basic statistics to ensure consistent physiological regressors quality
-# 
-# First, we will use AFNI's ```gen_ss_review_table.py``` to gather into a single file quality metrics regarding peak detection on the cardiac and respiratory traces. As one can expect for cardiac and respiratory rates to be somehow within a limited range, looking for scans where these are outliers is one good way to automatically detect scans with incorrect physiological regressors.
-# 
-# ```bash
-# ml afni
-# cd /data/SFIMJGC_HCP7T/BCBL2024/prcs_data
-# 
-# gen_ss_review_table.py -overwrite \
-#                        -write_table ./physio_card_review_all_scans.txt \
-#                        -infiles ./sub-*/D04_Physio/sub-*_ses-?_task-rest_echo-1_card_review.txt
-# 
-# gen_ss_review_table.py -overwrite \
-#                        -write_table ./physio_resp_review_all_scans.txt \
-#                        -infiles ./sub-*/D04_Physio/sub-*_ses-?_task-rest_echo-1_resp_review.txt
-#                        
-# ```
-
-# We now read these pysio report files, one for cardiac regressors and one for respiration regressors
-
 # In[12]:
-
-
-report_card_summary_path  = osp.join(PRJ_DIR,'prcs_data','physio_card_review_all_scans.txt')
-report_resp_summary_path  = osp.join(PRJ_DIR,'prcs_data','physio_resp_review_all_scans.txt')
-
-
-# ### 2.3 Detect scans where peak detection for cardiac traces might have failed
-# 
-# To detect potential errors in cardiac peak detection, we will characterize each scan by its mean inter-peak interval and its standard devation. We will then use IsolationForest to detect outliers, namely scans whose mean and standard deviation deviate from the most common ones in the sample
-
-# In[13]:
-
-
-report_card_summary_df = read_group_physio_reports(report_card_summary_path)
-
-
-# In[14]:
-
-
-clf    = IsolationForest(contamination=0.1, random_state=42)
-labels = clf.fit_predict(report_card_summary_df['peak ival over dset mean std'])
-outliers = labels == -1
-df_card = report_card_summary_df['peak ival over dset mean std'].copy()
-df_card.columns=['Mean','St.Dev.']
-df_card['color'] = ['red' if c else 'green' for c in outliers]
-plot = df_card.hvplot.scatter(x='Mean',y='St.Dev.', c='color', title='Cardiac Inter-peak Interval (seconds)', aspect='square', hover_cols=['Subject','Run'], alpha=0.5) 
-
-
-# In[15]:
-
-
-plot
-
-
-# In the figure above, each dot represents a scan. Red dots are scans marked as outliers.
-# 
-# Finally, we create a list with the non-outlier scans. These are scans that, from the perspective of peak detection in the cardiac traces, are valid for further analyses.
-
-# In[16]:
-
-
-scans_with_reasonable_cardiac = df_card[df_card['color']=='green'].index
-len(scans_with_reasonable_cardiac)
-
-
-# ### 2.4 Detect scans where peak detection for respiratory traces might have failed
-# 
-# Here we apply the same logic as in the above section, but this time looking at the inter-peak interval statistics for the respiratory traces
-
-# In[17]:
-
-
-report_resp_summary_df = read_group_physio_reports(report_resp_summary_path)
-
-
-# In[18]:
-
-
-clf    = IsolationForest(contamination=0.1, random_state=42)
-labels = clf.fit_predict(report_resp_summary_df['peak ival over dset mean std'])
-outliers = labels == -1
-df_resp = report_resp_summary_df['peak ival over dset mean std'].copy()
-df_resp.columns=['Mean','St.Dev.']
-df_resp['color'] = ['red' if c else 'green' for c in outliers]
-plot = df_resp.hvplot.scatter(x='Mean',y='St.Dev.', c='color', title='Resp. Inter-peak Interval (seconds)', aspect='square', hover_cols=['Subject','Run'], alpha=0.5)
-plot
-
-
-# In the figure above, each dot represents a scan. Red dots are scans marked as outliers.
-# 
-# Finally, we create a list with the non-outlier scans. These are scans that, from the perspective of peak detection in the respiratory traces, are valid for further analyses.
-
-# In[19]:
-
-
-scans_with_reasonable_resp = df_resp[df_resp['color']=='green'].index
-len(scans_with_reasonable_resp)
-
-
-# ### 2.5. Combine information gathered from cardiac and respiratory peak detection to create a final list of scans
-# 
-# We now create a final list of scans with valid physiological data by keeping only scans not marked as outliers both from the cardiac and respiration perspective.
-
-# In[20]:
 
 
 selected_scans = scans_with_complete_physio
 print("++ INFO: Number of scans with complete physiological regressors: %d scans" % len(selected_scans))
 
 
-# In[21]:
+# In[13]:
 
 
 pd.DataFrame(index=selected_scans).reset_index().to_csv(f'./summary_files/{DATASET}_CompletePhysio_ScanList.csv', index=False)
@@ -295,7 +191,7 @@ pd.DataFrame(index=selected_scans).reset_index().to_csv(f'./summary_files/{DATAS
 # 
 # ### 3.1. Create path for Swarm file
 
-# In[22]:
+# In[14]:
 
 
 script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N06b_Compute_varexp_in_GS_by_physio.SWARM.sh')
@@ -304,7 +200,7 @@ print(script_path)
 
 # ### 3.2. Create folder for logs
 
-# In[23]:
+# In[15]:
 
 
 log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N06b_Compute_varexp_in_GS_by_physio.log')
@@ -317,7 +213,7 @@ print(log_path)
 # 
 # This will contain one line per-scan that we have marked as having good physiological data.
 
-# In[24]:
+# In[16]:
 
 
 with open(script_path, 'w') as the_file:
@@ -334,7 +230,7 @@ the_file.close()
 
 # The next cell help us look for issues when running the batch jobs. If all things went well there should be no WARNING lines printed out.
 
-# In[25]:
+# In[17]:
 
 
 for sbj,ses in tqdm(selected_scans):
@@ -345,7 +241,7 @@ for sbj,ses in tqdm(selected_scans):
 
 # We will now compile all results into a single csv file for later exploration
 
-# In[26]:
+# In[18]:
 
 
 df = pd.DataFrame(index=selected_scans,columns=['Var. Exp. by Physio Regressors'])
@@ -368,7 +264,7 @@ df.to_csv(f'./summary_files/{DATASET}_varexp_gs_physio.real_data.csv')
 # 
 # ### 4.1. Create path for swarm file
 
-# In[27]:
+# In[19]:
 
 
 script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N06c_Compute_varexp_in_GS_by_physio_nulls.SWARM.sh')
@@ -377,7 +273,7 @@ print(script_path)
 
 # ### 4.2. Create folder for logs
 
-# In[28]:
+# In[ ]:
 
 
 log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N06c_Compute_varexp_in_GS_by_physio_nulls.log')
@@ -401,7 +297,7 @@ os.makedirs(perm_dir)
 # 
 # Here, for each permutation, we first randomly select one scan (sbj,ses) for the global signal. Then we randomly select one scan from any other subject for the physiological regressors.
 
-# In[32]:
+# In[ ]:
 
 
 n_null_cases = 10000
@@ -423,7 +319,7 @@ the_file.close()
 
 # ### 4.5. Check all permutations finished correctly
 
-# In[33]:
+# In[ ]:
 
 
 for i in tqdm(range(n_null_cases)):
@@ -435,7 +331,7 @@ for i in tqdm(range(n_null_cases)):
 
 # We will now compile all results into a single csv file for later exploration
 
-# In[34]:
+# In[ ]:
 
 
 df = pd.DataFrame(index=range(n_null_cases),columns=['Var. Exp. by Physio Regressors (NULL)'])

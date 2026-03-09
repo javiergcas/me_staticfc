@@ -1,17 +1,8 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py:light
-#     text_representation:
-#       extension: .py
-#       format_name: light
-#       format_version: '1.5'
-#       jupytext_version: 1.16.1
-#   kernelspec:
-#     display_name: Generic Kernel (2025a)
-#     language: python
-#     name: generic_2025a
-# ---
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
 
 import os.path as osp
 import pandas as pd
@@ -38,48 +29,76 @@ from afnipy.lib_afni1D import Afni1D
 from afnipy import lib_physio_reading as lpr
 from afnipy import lib_physio_opts as lpo
 
+
+# In[2]:
+
+
 # allows visualisation in notebook
 from bokeh.io import output_notebook
 from bokeh.resources import INLINE
 output_notebook(INLINE)
 
-import os
-port_tunnel = int(os.environ['PORT2'])
-print('++ INFO: Second Port available: %d' % port_tunnel)
+
+# In[3]:
+
 
 DATASET='evaluation'
 CENSOR_MODE = 'ALL'
+
+
+# In[4]:
+
 
 ds_index = get_dataset_index(DATASET)
 ses_list = list(ds_index.get_level_values('Session').unique())
 sbj_list = list(ds_index.get_level_values('Subject').unique())
 
+
+# In[5]:
+
+
 fMRI_num_discarded_volumes = NUM_DISCARDED_VOLUMES[DATASET]
+
 
 # ***
 # # 1. Load data
-#
+# 
 # ### 1.1. Kappa and Rho for Global Signal
+
+# In[6]:
+
 
 kappa_rho_df = pd.read_csv(f'./cache/{DATASET}_gs_kappa_rho.{CENSOR_MODE}.csv', index_col=[0,1])
 print("++ INFO: The shape of kappa_rho_df is %s" % str(kappa_rho_df.shape))
 kappa_rho_df.head(2)
 
+
 # ### 1.2. Load Variance Explained by Physiological Regressors
-#
+# 
 # > **NOTE:** This dataframe contains less entries than the one above because good physio was not available for all scans.
+
+# In[7]:
+
 
 real_varex_df = pd.read_csv('./cache/real_varexp_gs_physio.csv', index_col=[0,1])
 print("++ INFO: The shape of real_varex_df is %s" % str(real_varex_df.shape))
 real_varex_df.head(2)
 
+
 # We also load the null distribution of variance explained in GS by physio regressors
+
+# In[8]:
+
 
 null_varex_df = pd.read_csv('./cache/null_varexp_gs_physio.csv', index_col=[0])
 print("++ INFO: The shape of null_varex_df is %s" % str(null_varex_df.shape))
 null_varex_df.head(2)
 
+
 # ### 1.3. Load Head Motion estimates
+
+# In[9]:
+
 
 mms = MinMaxScaler(feature_range=(2, 100))
 motion_df = pd.DataFrame(index=ds_index, columns = ['Mean Motion (enorm)','Max. Motion (enorm)'])
@@ -93,39 +112,62 @@ motion_df = motion_df.infer_objects()
 motion_df['Mean Motion (dot size)'] = mms.fit_transform(motion_df['Mean Motion (enorm)'].values.reshape(-1,1))
 motion_df['Max. Motion (dot size)'] = mms.fit_transform(motion_df['Max. Motion (enorm)'].values.reshape(-1,1))
 
+
 # ### 1.4. Load TSNR and pBOLD for all scans
+
+# In[10]:
+
 
 import pickle
 with open(f'./cache/{DATASET}_QC_metrics_{CENSOR_MODE}.pkl', 'rb') as f:
     QC_metrics = pickle.load(f)
 QC_metrics.keys()
 
+
 # ***
 # # 2. Explore GS Kappa and Rho
-#
+# 
 # ### 2.1. Is GS Kappa (i.e., BOLD) or Rho (i.e., non-BOLD) dominated?
-#
+# 
 # Below we show a scatter plot of Kappa vs. Rho:
-#
+# 
 # 1. Each dot represents a scan
 # 2. The dotted line is the 45o (identity) line.
 # 3. Any scan above the 45o line has kappa < rho (marked in red)
 # 4. Any scan below the 45o line has kappa > rho (marked in green)
 # 5. Dots size is proportional to mean motion (estimated via enorm)
-#
+# 
+
+# In[11]:
+
 
 df = pd.concat([kappa_rho_df, motion_df], axis=1)
 df.head(3)
 
+
+# In[12]:
+
+
 kappa_vs_rho_byType = df.hvplot.scatter(x='kappa (GS)',y='rho (GS)', aspect='square', hover_cols=['Subject','Session'], c='kappa_rho_color',s='Mean Motion (dot size)', title='Global Signal Kappa vs. Rho') *hv.Slope(1,0).opts(line_width=0.5,line_dash='dashed', line_color='black')
+
+
+# In[13]:
+
 
 cbar_min = df['Max. Motion (enorm)'].quantile(0.05)
 cbar_max = df['Max. Motion (enorm)'].quantile(0.99)
 kappa_vs_rho_byMotion = df.hvplot.scatter(x='kappa (GS)',y='rho (GS)', aspect='square', hover_cols=['Subject','Session'], c='Max. Motion (enorm)', title='Global Signal Kappa vs. Rho', cmap='cividis').opts(clim=(cbar_min,cbar_max)) *hv.Slope(1,0).opts(line_width=0.5,line_dash='dashed', line_color='black')
 
+
+# In[14]:
+
+
 kappa_vs_rho_byType + kappa_vs_rho_byMotion
 
-# +
+
+# In[15]:
+
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -206,51 +248,69 @@ g.set_axis_labels("kappa (GS)", "rho (GS)")
 g.ax_joint.set_xlim(12,125)
 g.ax_joint.set_ylim(12,125)
 plt.show()
-# -
+
 
 # ***
 # # 3. Explore Variance Explained by Physiological Regressors
-#
+# 
 # ### 3.1. How much variance do physio regressors explained in our sample?
+
+# In[16]:
+
 
 non_parametric_p005 = null_varex_df.quantile(0.95).values[0]
 print(non_parametric_p005)
 
-import os
-port_tunnel = int(os.environ['PORT3'])
-print('++ INFO: Second Port available: %d' % port_tunnel)
-#port_tunnel = 45719
 
-dashboard.stop()
+# In[19]:
+
+
+#dashboard.stop()
 graph = (hv.VSpan(non_parametric_p005,1.0).opts(fill_color='lightgray', line_color='white') * \
 real_varex_df.hvplot.hist(bins=20, xlim=(0,1),                     ylabel=' % Scans', xlabel="$$Adj. R2$$",normed=True, label='Real Data', legend=False, fontscale=1.5, color='gray') * \
 real_varex_df.hvplot.kde(          xlim=(0,1),                     ylabel=' % Scans',              label='Real Data', legend=False, color='gray'))
-dashboard = pn.Row(graph).show(port=port_tunnel, open=False)
+dashboard = pn.Row(graph).show()
 
-    from numpy import arange
-    from bokeh.plotting import figure, show
 
-    x = arange(1, 4.5, 0.25)
-    y = 1 / x
-    plot = figure(height=200)
-    plot.circle(x, y, fill_color="blue", size=5)
-    plot.line(x, y, color="darkgrey")
-    plot.xaxis.axis_label = "Resistance"
-    plot.xaxis.ticker = [1, 2, 3, 4]
-    plot.yaxis.axis_label = "Current at 1 V"
-    plot.xaxis.major_label_overrides = {
-        1: r"$$1\\ \\Omega$$",
-        2: r"$$2\\ \\Omega$$",
-        3: r"$$3\\ \\Omega$$",
-        4: r"$$4\\ \\Omega$$",
-    }
-    show(plot)
+# In[20]:
+
+
+from numpy import arange
+from bokeh.plotting import figure, show
+
+x = arange(1, 4.5, 0.25)
+y = 1 / x
+plot = figure(height=200)
+plot.circle(x, y, fill_color="blue", size=5)
+plot.line(x, y, color="darkgrey")
+plot.xaxis.axis_label = "Resistance"
+plot.xaxis.ticker = [1, 2, 3, 4]
+plot.yaxis.axis_label = "Current at 1 V"
+plot.xaxis.major_label_overrides = {
+    1: r"$$1\\ \\Omega$$",
+    2: r"$$2\\ \\Omega$$",
+    3: r"$$3\\ \\Omega$$",
+    4: r"$$4\\ \\Omega$$",
+}
+show(plot)
+
+
+# In[21]:
+
 
 num_scans_with_physio_not_significantly_explaining_any_variance = (real_varex_df>=non_parametric_p005).sum().values[0]
 pc_scans_with_physio_not_significantly_explaining_any_variance = 100 * num_scans_with_physio_not_significantly_explaining_any_variance / real_varex_df.shape[0]
 print("++ INFO: Number and [percentage] of scans for which physio regressors explain a signficiant amount of variance: %d [ %.2f%% ]" % (num_scans_with_physio_not_significantly_explaining_any_variance,pc_scans_with_physio_not_significantly_explaining_any_variance))
 
+
+# In[22]:
+
+
 real_varex_df.mean()
+
+
+# In[23]:
+
 
 hv.VSpan(non_parametric_p005,1.0).opts(fill_color='gray') * \
 real_varex_df.hvplot.hist(bins=20, xlim=(0,1),                     ylabel=' % Scans', xlabel=r'$$adjusted R^{2}$$',normed=True, label='Real Data', legend=False, fontscale=1.5) * \
@@ -259,11 +319,28 @@ hv.Text(0.5,7,'p > 0.05') + \
 null_varex_df.hvplot.hist(bins=20, xlim=(0,1), title='Variance Explained by Physio Regressors in the Global Signal (NULL Distribution)', ylabel=' % Scans', normed=True, label='Null Distribution', color='gray') * \
 null_varex_df.hvplot.kde(          xlim=(0,1), title='Variance Explained by Physio Regressors in the Global Signal',                     ylabel=' % Scans',              label='Null Distribution', color='gray')
 
+
+# In[23]:
+
+
 (real_varex_df > 0.5).sum()
+
+
+# In[41]:
+
 
 v = float(real_varex_df.loc['sub-158','ses-1'].values[0])
 real_varex_df.sort_values(by='Var. Exp. by Physio Regressors').reset_index(drop=True).hvplot() * hv.HLine(v)
 
+
+# In[39]:
+
+
 float(real_varex_df.loc['sub-158','ses-1'].values[0])
+
+
+# In[ ]:
+
+
 
 

@@ -284,7 +284,7 @@ print(log_path)
 
 # ### 4.3. Create a folder where to save the results of each of the 10,000 null permutations
 
-# In[ ]:
+# In[21]:
 
 
 perm_dir = osp.join(CODE_DIR,'notebooks','cache','gs_phys_varex_perms')
@@ -297,7 +297,7 @@ os.makedirs(perm_dir)
 # 
 # Here, for each permutation, we first randomly select one scan (sbj,ses) for the global signal. Then we randomly select one scan from any other subject for the physiological regressors.
 
-# In[ ]:
+# In[22]:
 
 
 n_null_cases = 10000
@@ -319,7 +319,7 @@ the_file.close()
 
 # ### 4.5. Check all permutations finished correctly
 
-# In[ ]:
+# In[23]:
 
 
 for i in tqdm(range(n_null_cases)):
@@ -331,7 +331,7 @@ for i in tqdm(range(n_null_cases)):
 
 # We will now compile all results into a single csv file for later exploration
 
-# In[ ]:
+# In[24]:
 
 
 df = pd.DataFrame(index=range(n_null_cases),columns=['Var. Exp. by Physio Regressors (NULL)'])

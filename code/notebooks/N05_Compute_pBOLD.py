@@ -11,7 +11,7 @@
 # 
 # The last cell allows to identify potential jobs that might have failed.
 
-# In[1]:
+# In[12]:
 
 
 import os.path as osp
@@ -28,14 +28,14 @@ from utils.basics import PRJ_DIR, ATLASES_DIR, CODE_DIR, TES_MSEC
 import datetime
 
 
-# In[2]:
+# In[13]:
 
 
 CENSORING_MODE='ALL'
 DATASET = input ('Select Dataset (discovery or evaluation):')
 
 
-# In[3]:
+# In[14]:
 
 
 ATLAS_NAME = f'Power264-{DATASET}'
@@ -46,7 +46,7 @@ echo_times_dict = TES_MSEC[DATASET]
 
 # Get username. We use this to create user specific locations for SWARM and log files.
 
-# In[4]:
+# In[15]:
 
 
 import getpass
@@ -56,7 +56,7 @@ print(username)
 
 # Get list of scans in the dataset
 
-# In[5]:
+# In[16]:
 
 
 ds_index = get_dataset_index(DATASET)
@@ -66,7 +66,7 @@ sbj_list = list(ds_index.get_level_values('Subject').unique())
 
 # Get username. We use this to create user specific locations for SWARM and log files.
 
-# In[6]:
+# In[17]:
 
 
 import getpass
@@ -78,7 +78,7 @@ print(username)
 # 
 # Create path to SWARM script
 
-# In[7]:
+# In[18]:
 
 
 script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N05_Compute_pBOLD.{DATASET}.{ATLAS_NAME}.SWARM.sh')
@@ -87,7 +87,7 @@ print(script_path)
 
 # Create folder for logs created by the batch jobs
 
-# In[8]:
+# In[19]:
 
 
 log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N05_Compute_pBOLD.{DATASET}.{ATLAS_NAME}.log')
@@ -98,13 +98,13 @@ print(log_path)
 
 # Create the SWARM script. This script will have one line per scan
 
-# In[9]:
+# In[20]:
 
 
 echo_times_in_msec = ','.join([str(te) for _,te in echo_times_dict.items()])
 
 
-# In[10]:
+# In[21]:
 
 
 with open(script_path, 'w') as the_file:

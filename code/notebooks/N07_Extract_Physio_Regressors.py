@@ -15,17 +15,10 @@
 
 import os.path as osp
 import pandas as pd
-import numpy as np
 import os
 from tqdm import tqdm
 import datetime
-from utils.basics import PRJ_DIR, PRCS_DATA_DIR, DOWNLOAD_DIRS, CODE_DIR, read_group_physio_reports
-from sklearn.ensemble import IsolationForest
-import hvplot.pandas
-import holoviews as hv
-from scipy.stats import zscore
-import statsmodels.api as sm
-from afnipy.lib_afni1D import Afni1D
+from utils.basics import PRJ_DIR, PRCS_DATA_DIR, DOWNLOAD_DIRS, CODE_DIR
 import shutil
 import pickle
 from utils.basics import get_dataset_index
@@ -250,7 +243,7 @@ for sbj,ses in tqdm(selected_scans):
     model_path  = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'pb03.{sbj}.r01.e02.volreg.GS.PhysioModeling.pkl')
     with open(model_path, 'rb') as f:
         loaded_dict = pickle.load(f)
-    model = loaded_dict['model'] #sm.load(model_path)
+    model = loaded_dict['model']
     df.loc[(sbj,ses),'Var. Exp. by Physio Regressors'] = model.rsquared
 df=df.infer_objects()
 df.to_csv(f'./summary_files/{DATASET}_varexp_gs_physio.real_data.csv')
@@ -273,7 +266,7 @@ print(script_path)
 
 # ### 4.2. Create folder for logs
 
-# In[ ]:
+# In[20]:
 
 
 log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N06c_Compute_varexp_in_GS_by_physio_nulls.log')
@@ -284,7 +277,7 @@ print(log_path)
 
 # ### 4.3. Create a folder where to save the results of each of the 10,000 null permutations
 
-# In[21]:
+# In[ ]:
 
 
 perm_dir = osp.join(CODE_DIR,'notebooks','cache','gs_phys_varex_perms')

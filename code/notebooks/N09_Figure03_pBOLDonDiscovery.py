@@ -15,14 +15,13 @@ import seaborn as sns
 import pandas as pd
 import panel as pn
 import matplotlib.pyplot as plt
-from utils.basics import get_dataset_index, DOWNLOAD_DIRS, ATLASES_DIR
+from utils.basics import DOWNLOAD_DIRS, ATLASES_DIR
 import pickle
 import os.path as osp
 
 ATLAS_NAME = 'Power264-discovery'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
-import panel as pn
 import holoviews as hv
 import xarray as xr
 from utils.fc_matrices import hvplot_fc
@@ -31,7 +30,6 @@ from utils.basics import get_altas_info
 from utils.basics import CODE_DIR
 pn.extension('mathjax')   # panel comms + latex support
 hv.extension('bokeh')     # set backend early
-from nilearn.connectome import sym_matrix_to_vec
 
 
 # ***
@@ -187,7 +185,7 @@ left_fc = fc[(cg_lowest_pBOLD_sbj,'cardiac_gated','ALL_Basic','off','e02|e02','R
 right_fc = fc[(cg_highest_pBOLD_sbj,'cardiac_gated','ALL_Basic','off','e02|e02','R')]
 
 
-# In[ ]:
+# In[16]:
 
 
 left_label = hv.Text(x=50,y=210, text='pBOLD=%.2f' % So_heavy_data.loc[cg_lowest_pBOLD_sbj].values[0], fontsize=20).opts(text_font_style='italic', text_color='w')
@@ -214,13 +212,13 @@ pn.Row((plot_fc_left*left_label).opts(toolbar=None),
 # ***
 # # 5. Figure 3.d
 
-# In[26]:
+# In[18]:
 
 
 from utils.dashboard import gen_scatter
 
 
-# In[27]:
+# In[19]:
 
 
 cg_highest_pBOLD_sbj = BOLD_heavy_data.sort_values(by='pBOLD',ascending=False).index[0]
@@ -229,7 +227,7 @@ print('++ Constant-gated scan with the highest pBOLD is for Subject=%s' % cg_hig
 print('++ Constant-gated scan with the lowest  pBOLD is for Subject=%s' % cg_lowest_pBOLD_sbj)
 
 
-# In[36]:
+# In[20]:
 
 
 left_scatter = gen_scatter(DATASET,fc,cg_highest_pBOLD_sbj,'constant_gated','ALL_Tedana-fastica','on','e01|e01','e03|e03','C', show_linear_fit=False, ax_lim=1, hexbin=False, title=None).opts(fontscale=1.5, toolbar=None)
@@ -244,7 +242,7 @@ pn.Row(left_scatter,right_scatter).save('./figures/pBOLD_Figure03_d.html')
 # ***
 # # 6. Figure 3.e
 
-# In[37]:
+# In[21]:
 
 
 cg_highest_pBOLD_sbj = So_heavy_data.sort_values(by='pBOLD',ascending=False).index[0]
@@ -253,7 +251,7 @@ print('++ Cardiac-gated scan with the highest pBOLD is for Subject=%s' % cg_high
 print('++ Cardiac-gated scan with the lowest  pBOLD is for Subject=%s' % cg_lowest_pBOLD_sbj)
 
 
-# In[39]:
+# In[22]:
 
 
 left_scatter = gen_scatter(DATASET,fc,cg_lowest_pBOLD_sbj,'cardiac_gated','ALL_Basic','off','e01|e01','e03|e03','C', show_linear_fit=False, ax_lim=1, hexbin=False, title=None).opts(fontscale=1.5, toolbar=None)
@@ -270,7 +268,7 @@ pn.Row(left_scatter,right_scatter).save('./figures/pBOLD_Figure03_e.html')
 
 # Identify the cardiac-gated scans with the highest and lowest pBOLD values
 
-# In[18]:
+# In[23]:
 
 
 cg_highest_pBOLD_sbj = So_heavy_data.sort_values(by='pBOLD',ascending=False).index[0]
@@ -281,7 +279,7 @@ print('++ Cardiac-gated scan with the lowest  pBOLD is for Subject=%s' % cg_lowe
 
 # Load Trigger info for the highest pBOLD scan
 
-# In[19]:
+# In[24]:
 
 
 path = osp.join(DOWNLOAD_DIRS[DATASET],cg_highest_pBOLD_sbj,'cardiac_gated','func',f'{cg_highest_pBOLD_sbj}_cardiac_gated_task-rest.Triggers.1D')
@@ -292,24 +290,23 @@ highest_pBOLD_tigger_onsets = trigger_df.set_index(['slice','acquisition']).loc[
 
 # Load Trigger information for the lowest pBOLD scan
 
-# In[20]:
+# In[26]:
 
 
-# Load Trigger info for cardiac gated scan with lowest pBOLD
 path = osp.join(DOWNLOAD_DIRS[DATASET],cg_lowest_pBOLD_sbj,'cardiac_gated','func',f'{cg_lowest_pBOLD_sbj}_cardiac_gated_task-rest.Triggers.1D')
 trigger_df = pd.read_csv(path, sep=' ', skiprows=2, header=None)
 trigger_df.columns = ['onset','slice','acquisition']
 lowest_pBOLD_tigger_onsets = trigger_df.set_index(['slice','acquisition']).loc[0,:].diff() - 2500
 
 
-# In[23]:
+# In[27]:
 
 
 df = pd.concat([lowest_pBOLD_tigger_onsets,highest_pBOLD_tigger_onsets,],axis=1).dropna()
 df.columns = ['pBOLD=%.2f' % So_heavy_data.loc[cg_lowest_pBOLD_sbj].values[0],'pBOLD=%.2f' % So_heavy_data.loc[cg_highest_pBOLD_sbj].values[0]]
 
 
-# In[24]:
+# In[28]:
 
 
 sns.set(font_scale=1.3)

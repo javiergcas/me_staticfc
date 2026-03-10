@@ -55,6 +55,31 @@ def mse_dist(points,m1,s1,m2,s2,weight_fn=None, max_weight_fn=lambda r: np.minim
         return {'p_line1':frac_line1,'d1':pd1,'w':w,'r':r}
     else:
         return frac_line1
+
+def chord_distance_between_intersecting_lines(m1, m2, r=1.0):
+    """
+    Compute the chord distance between two lines intersecting at the origin,
+    based on points at distance r from the origin along each line.
+
+    Inputs:
+    m1: slope of the first line
+    m2: slope of the second line
+    r: radious at which to compute the distance [default = 1.0]
+
+    Returns:
+    distance: chord distance between both lines.
+    """
+    # points on line 1
+    x1 = r / np.sqrt(1 + m1**2)
+    y1 = m1 * x1
+
+    # points on line 2
+    x2 = r / np.sqrt(1 + m2**2)
+    y2 = m2 * x2
+
+    # Euclidean distance between the points
+    distance = np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+    return distance
     
 def process_command_line():
     parser = argparse.ArgumentParser(description="Compute pBOLD")
@@ -148,13 +173,29 @@ def main():
                         tol=opts.line_pref_tolerance)
         print('pBOLD = %.4f' % (pBOLD))
         pBOLD_results[quad] = pBOLD
-    
+    pBOLD_df = pd.Series(pBOLD_results, name='pBOLD').to_frame()
+    # Compute Single pBOLD value per scan
+    # ===================================
+    print('++ INFO: Computing scan-level pBOLD...')
+    print('++ -----------------------------------')
+    # a) Compute the chord weigths associated with each TE quadruple
+    chord_weights = []
+    for ppe in te_quadruples:
+        eep1,eep2  = ppe.split('_vs_')
+        e1_X, e2_X = eep1.split('|')
+        e1_Y, e2_Y = eep2.split('|')
+        BOLD_line_sl  = (tes_dict[e1_Y]*tes_dict[e2_Y])/(tes_dict[e1_X]*tes_dict[e2_X])
+        chord_weights.append(chord_distance_between_intersecting_lines(1.0, BOLD_line_sl, r=0.5))
+    chord_weights = np.array(chord_weights)
+    print(' + Chord Weights = %s' % str(chord_weights))
+    #) Compute scan-level pBOLD weigthed avarate fo all computed values
+    pBOLD_scan_level = (pBOLD_df['pBOLD'].values * chord_weights).sum()/ chord_weights.sum()
+    pBOLD_df.loc['scan'] = pBOLD_scan_level
+    print(' +       Scan Level | pBOLD = %.4f' % (pBOLD_scan_level))
     # Save to disk
     # ============
-    out_df = pd.Series(pBOLD_results, name='pBOLD').to_frame()
-    out_df.index.name='ee_vs_ee'
-
-    out_df.to_csv(opts.output_path, index=True, header=True)
+    pBOLD_df.index.name='ee_vs_ee'
+    pBOLD_df.to_csv(opts.output_path, index=True, header=True)
     print('++ INFO: Results saved to disk --> %s' % opts.output_path)
 
 if __name__ == '__main__':

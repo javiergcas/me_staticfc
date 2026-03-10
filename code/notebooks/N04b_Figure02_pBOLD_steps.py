@@ -12,15 +12,12 @@ import pandas as pd
 import numpy as np
 import holoviews as hv
 import os.path as osp
-import os
-from tqdm import tqdm
-from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, PRJ_DIR, CODE_DIR, TES_MSEC
+from utils.basics import PRCS_DATA_DIR, ATLASES_DIR, TES_MSEC
 from utils.basics import get_altas_info
 from utils.fc_matrices import hvplot_fc
 import matplotlib.colors as mcolors
 
 #from sfim_lib.plotting.fc_matrices import hvplot_fc
-from itertools import combinations_with_replacement, combinations
 ATLAS_NAME = 'Power264-discovery'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 import panel as pn
@@ -28,7 +25,7 @@ pn.extension('mathjax')   # panel comms + latex support
 hv.extension('bokeh')     # set backend early
 from nilearn.connectome import sym_matrix_to_vec
 
-from utils.basics import echo_pairs_tuples, echo_pairs, pairs_of_echo_pairs
+from utils.basics import echo_pairs_tuples
 from utils.basics import chord_distance_between_intersecting_lines, line_circle_intersection
 
 echo_times_dict = TES_MSEC['discovery']

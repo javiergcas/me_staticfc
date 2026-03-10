@@ -1,20 +1,11 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py:light
-#     text_representation:
-#       extension: .py
-#       format_name: light
-#       format_version: '1.5'
-#       jupytext_version: 1.16.1
-#   kernelspec:
-#     display_name: BOLD WAVES 2024a
-#     language: python
-#     name: bold_waves_2024a
-# ---
+#!/usr/bin/env python
+# coding: utf-8
 
 # # Description
 # This notebook will create a version of the Powers 264 altas that only contains ROIs common to the FOV of all datasets part of the evaluation dataset.
+
+# In[1]:
+
 
 from nilearn.datasets import fetch_coords_power_2011
 from utils.basics import ATLASES_DIR
@@ -22,29 +13,57 @@ import os
 import os.path as osp
 import pandas as pd
 
+
 # # 1. Download ROI centers for Powers 264 altas using nilearn
+
+# In[2]:
+
 
 power_atlas_info = fetch_coords_power_2011(False)
 
+
+# In[3]:
+
+
 power_atlas_info['rois'].head(5)
+
 
 # # 2. Create Folder for Dataset-specific version of Powers 264 atlas
 
+# In[4]:
+
+
+# Build atlas identifiers and resolved output directory path for this dataset.
 ATLAS_NAME='Power264-evaluation'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 
+
+# In[5]:
+
+
+# Create atlas directory and link auxiliary files expected by downstream code.
 if not osp.exists(ATLAS_DIR):
     os.makedirs(ATLAS_DIR)
     os.symlink(osp.join(ATLASES_DIR,'Power264','additional_files'),osp.join(ATLAS_DIR,'additional_files'))
 
+
 # # 3. Write ROI centroids to disk as csv file
 
+# In[6]:
+
+
+# Save ROI MNI coordinates to the atlas-specific CSV used by the pipeline.
 roi_centers_path = osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_coords.MNI.csv')
 power_atlas_info['rois'][['x','y','z','roi']].to_csv(roi_centers_path, header=None, index=None)
 print("++ INFO: ROI Coordinates saved to disk [%s]" % roi_centers_path)
 
+
 # # 4. Add ROI Names and other info needed for plotting
 
+# In[7]:
+
+
+# Normalize ROI table schema used by downstream FC extraction/plotting utilities.
 roi_info_df = power_atlas_info['rois'].copy()
 roi_info_df.columns = ['ROI_ID','pos_A','pos_R','pos_S']
 roi_info_df['ROI_Name'] = ['ROI'+str(r).zfill(3) for r in roi_info_df['ROI_ID']]
@@ -52,7 +71,11 @@ roi_info_df = roi_info_df[['ROI_ID','ROI_Name','pos_A','pos_R','pos_S']]
 print(roi_info_df.shape)
 roi_info_df.head(5)
 
-# +
+
+# In[8]:
+
+
+# Map network labels to colors and merge supplemental metadata from the Power atlas sheet.
 color_map_dict={'White':'#ffffff','Cyan':'#E0FFFF','Orange':'#FFA500','Purple':'#800080',
                 'Pink':'#FFC0CB','Red':'#ff0000','Gray':'#808080','Teal':'#008080','Brown':'#A52A2A',
                 'Blue':'#0000ff','Yellow':'#FFFF00','Black':'#000000','Pale blue':'#ADD8E6','Green':'#00ff00'}
@@ -78,7 +101,7 @@ roi_info_df['Network']= power_atlas_addinfo['Suggested System']
 roi_info_df['Hemisphere'] = ['LH' if a<=0 else 'RH' for a in roi_info_df['pos_R']]
 roi_info_df['RGB'] = [color_map_dict[c] for c in power_atlas_addinfo['Unnamed: 34']]
 roi_info_df.head(5)
-# -
+
 
 # # 5. Create first version (still need to check for FOV) as NIFTI file
 
@@ -95,31 +118,52 @@ roi_info_df.head(5)
 
 # # 6. Create FOV masks for each dataset
 
-from utils.basics import PRCS_DATA_DIR, PRJ_DIR, CODE_DIR
+# In[9]:
+
+
+# Utilities for FOV QC swarm generation and AFNI command execution.
+from utils.basics import PRCS_DATA_DIR, PRJ_DIR
 import datetime
 import getpass
 import subprocess
 username = getpass.getuser()
 print(username)
 
+
+# In[10]:
+
+
 dataset_info_df = pd.read_csv(osp.join(PRJ_DIR,'resources','good_scans.txt'))
 dataset_info_df = dataset_info_df.set_index(['Subject','Session'])
 print('++ Number of scans: %s scans' % dataset_info_df.shape[0])
 
+
 # Create path for swarm file
+
+# In[11]:
+
 
 script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N02b_check_sample_FOV_vs_atlas.{ATLAS_NAME}.swarm.sh')
 print(script_path)
 
+
 # Create folder for swarm log files
+
+# In[12]:
+
 
 log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N02b_check_sample_FOV_vs_atlas.{ATLAS_NAME}.log')
 if not osp.exists(log_path):
     os.makedirs(log_path)
 print(log_path)
 
+
 # Create swarm file (one line per scan)
 
+# In[13]:
+
+
+# Build SWARM jobs to compute atlas-vs-FOV overlap masks for every scan.
 with open(script_path, 'w') as the_file:
     the_file.write('# Script Creation Date: %s\n' % str(datetime.date.today()))
     the_file.write(f'# swarm -f {script_path} -g 16 -t 8 -b 5 --time 00:20:00 --logdir {log_path} --partition quick,norm --module afni\n')
@@ -128,7 +172,12 @@ with open(script_path, 'w') as the_file:
         the_file.write(f'cd {PRCS_DATA_DIR}/{sbj}/D03_Preproc_{ses}_NORDIC-off; 3dcalc -overwrite -a tedana_fastica/adaptive_mask.nii.gz -expr "step(a)" -prefix mask_tedana_at_least_one_echo.nii.gz; 3dcalc -overwrite -a tedana_fastica/adaptive_mask.nii.gz -expr "equals(a,3)" -prefix mask_tedana_allechoes.nii.gz; 3drefit -space MNI mask_tedana_at_least_one_echo.nii.gz; 3drefit -space MNI mask_tedana_allechoes.nii.gz; 3dNetCorr -overwrite -in_rois {ATLASES_DIR}/{ATLAS_NAME}/{ATLAS_NAME}.nii.gz -output_mask_nonnull -inset pb04.{sbj}.r01.combine+tlrc.HEAD -prefix rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck \n')
 the_file.close()     
 
+
+# In[14]:
+
+
 script_path
+
 
 # You need to submit this as a batch job
 # ```bash
@@ -137,13 +186,22 @@ script_path
 
 # # 7. Ensure all necessary files were created by the swarm job
 
+# In[16]:
+
+
+# Check that the expected FOV-check outputs were produced for each scan.
 for sbj,ses in list(dataset_info_df.index):
     expected_output_path = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_mask_nnull+tlrc.HEAD')
     if not osp.exists(expected_output_path):
         print('++ WARNING: %s is missing' % expected_output_path)
 
+
 # # 8. See which ROIs do not have at least 5% overlap with the imaging FOV of any subject
 
+# In[17]:
+
+
+# Aggregate ROIs with poor coverage across scans using frac/N_nonnull thresholds.
 bad_roi_list = []
 for sbj,ses in list(dataset_info_df.index):
     roidat_path       = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'rm.{sbj}.combine.{ATLAS_NAME}.FOVcheck_000.roidat')
@@ -158,12 +216,29 @@ for sbj,ses in list(dataset_info_df.index):
     for i,br in bad_rois.iterrows():
         bad_roi_list.append((br['ROI'],br['ROI_label']))
 
+
+# In[18]:
+
+
 bad_roi_list = list(set(bad_roi_list))
+
+
+# In[19]:
+
 
 print(bad_roi_list)
 
+
+# In[20]:
+
+
 print('++ INFO: Number of ROIs to remove = %d ROIs' % len(bad_roi_list))
 
+
+# In[21]:
+
+
+# Drop bad ROIs, re-index ROI IDs/names, and persist the updated ROI info table.
 roi_info_df = roi_info_df.drop([i for i,_ in bad_roi_list])
 roi_info_df = roi_info_df.reset_index(drop=True)
 roi_info_df['ROI_ID'] = roi_info_df.index
@@ -171,15 +246,29 @@ roi_info_df['ROI_Name'] = ['ROI'+str(r).zfill(3) for r in roi_info_df['ROI_ID']]
 print(roi_info_df.shape)
 roi_info_df.to_csv(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.roi_info.csv'), index=False)
 
+
+# In[22]:
+
+
 roi_info_df.reset_index(drop=True)
+
 
 # # 9. We create a new NIFTI file where those ROIs have been removed.
 
+# In[23]:
+
+
+# Build 3dcalc expressions to isolate removed ROIs and generate an FOV-restricted atlas.
 bad_rois_minus = '-'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
 bad_rois_plus  = '+'.join([str(r)+'*equals(a,'+str(r)+')' for r,rs in bad_roi_list])
 print(bad_rois_minus)
 print(bad_rois_plus)
 
+
+# In[24]:
+
+
+# Run AFNI commands to write removed-ROI and restricted-atlas NIfTI files.
 command=f"""module load afni; \
            cd {ATLAS_DIR}; \
            3dcalc -overwrite \
@@ -194,45 +283,97 @@ command=f"""module load afni; \
 output  = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
 print(output.strip().decode())
 
+
+# In[25]:
+
+
 from nilearn.plotting import plot_roi
+
+
+# In[26]:
+
 
 plot_roi(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.RemovedROIs.nii.gz'),title='ROIs that will be removed from the ATLAS')
 
+
+# In[27]:
+
+
 plot_roi(osp.join(ATLAS_DIR,f'{ATLAS_NAME}.nii.gz'),title='Original ATLAS')
+
+
+# In[28]:
+
 
 plot_roi(osp.join(ATLAS_DIR,f'rm.{ATLAS_NAME}.fov_restricted.nii.gz'),title='FOV-Restricted ATLAS')
 
+
+# In[29]:
+
+
+# Re-rank ROI labels so the restricted atlas has contiguous integer ROI IDs.
 command = f"""ml afni; \
              cd {ATLAS_DIR}; \
              3dRank -overwrite -prefix {ATLAS_NAME}.nii.gz -input rm.{ATLAS_NAME}.fov_restricted.nii.gz;"""
 output  = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
 print(output.strip().decode())
 
+
 # ***
 # # Prepare Files for BrainNetViewer
-#
+# 
 # The first file will be loaded as node
-#
+# 
 # The second file must be loaded in the Node tab within the Options window
+
+# In[30]:
+
 
 nw_list = list(roi_info_df['Network'].unique())
 Nw2ID={r:i+1 for i,r in enumerate(nw_list)}
 
+
+# In[31]:
+
+
+# Export BrainNetViewer node table with ROI coordinates and network-driven node colors.
 roi_info_df['Node Size'] = 1
 roi_info_df['Short ROI Name'] = roi_info_df['ROI_Name']
 roi_info_df['Node Color'] = [Nw2ID[n] for n in roi_info_df['Network']]
 aux = roi_info_df[['pos_A','pos_R','pos_S','Node Color','Node Size','Short ROI Name']]
 aux.to_csv('../../../resources/BrainNetViewer/BrainNetViewer_Nodes.node', sep=' ', index=None, header=None)
 
+
+# In[32]:
+
+
 from matplotlib.colors import hex2color
 import numpy as np
 
+
+# In[33]:
+
+
+# Convert hex network colors to normalized RGB rows for BrainNetViewer color input.
 c = []
 for n in nw_list:
     c = c + [np.array(hex2color(roi_info_df.set_index('Network').loc[n,'RGB'].values[0]))]
 
+
+# In[34]:
+
+
 c = np.array(c)
 
+
+# In[35]:
+
+
 np.savetxt('../../../resources/BrainNetViewer/BrainNetViewer_Nodes_colors.txt',c, fmt='%0.4f', delimiter=',')
+
+
+# In[ ]:
+
+
 
 

@@ -58,7 +58,7 @@ pBOLD.head(3)
 
 
 # ***
-# # 2. Load TNSR
+# # 2. Load TSNR
 # 
 # Create path to the file with all TSNR estimates (previously generated in ```N08_Gather_Results.ipynb```)
 
@@ -217,8 +217,12 @@ fig_banner = pn.pane.HTML(
 figure04 = pn.Column(fig_banner, pn.Row(panel_a,panel_b), width=1750)
 
 
-# In[31]:
+# In[33]:
 
 
-figure04
+figure04.save('./figures/pBOLD_Figure04.html')
 
+
+# Here is the final figure in static form (for github rendering)
+# 
+# ![Figure 04](figures/pBOLD_Figure04.png)

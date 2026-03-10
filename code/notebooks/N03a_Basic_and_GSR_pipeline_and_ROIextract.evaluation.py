@@ -51,7 +51,7 @@
 # 
 # ***
 
-# In[ ]:
+# In[1]:
 
 
 import pandas as pd
@@ -77,9 +77,10 @@ print(username)
 
 # Select dataset and atlas
 
-# In[4]:
+# In[3]:
 
 
+# Run configuration: choose dataset and atlas folder/name derived from it.
 DATASET    = 'evaluation'
 ATLAS_NAME = f'Power264-{DATASET}'
 ATLAS_DIR  = osp.join(ATLASES_DIR,ATLAS_NAME)
@@ -87,9 +88,10 @@ ATLAS_DIR  = osp.join(ATLASES_DIR,ATLAS_NAME)
 
 # # 1. Load Dataset Information
 
-# In[5]:
+# In[4]:
 
 
+# `ds_index` is the master list of (Subject, Session) scans used by loops below.
 ds_index = get_dataset_index(DATASET)
 ses_list = list(ds_index.get_level_values('Session').unique())
 sbj_list = list(ds_index.get_level_values('Subject').unique())
@@ -98,7 +100,7 @@ sbj_list = list(ds_index.get_level_values('Subject').unique())
 # # 2. Create Swarm Script to Extract ROI TS from Basic denoised data
 # Create path to SWARM script
 
-# In[6]:
+# In[5]:
 
 
 script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N03a_Basic_and_GSR_pipeline_and_ROIextract.{ATLAS_NAME}.SWARM.sh')
@@ -107,7 +109,7 @@ print(script_path)
 
 # Create folder for logs created by the batch jobs
 
-# In[7]:
+# In[6]:
 
 
 log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N03a_Basic_and_GSR_pipeline_and_ROIextract.{ATLAS_NAME}.log')
@@ -118,9 +120,11 @@ print(log_path)
 
 # Create the SWARM script. This script will have one line per scan that calls the script ```S08_Basic_and_GSR_pipeline_and_ROIextract.sh```. This script, as already stated, runs the basic and GSR pipelines per echo. It also extract ROI representative timeseries, FC matrices and TSNR maps
 
-# In[ ]:
+# In[7]:
 
 
+# Build a SWARM script with one job per scan and NORDIC mode.
+# Each job runs the Basic/GSR and ROI extraction shell script with required env vars.
 with open(script_path, 'w') as the_file:
     the_file.write('# Script Creation Date: %s\n' % str(datetime.date.today()))
     the_file.write(f'# swarm -f {script_path} -g 16 -t 8 -b 2 --time 02:00:00 --logdir {log_path} --partition quick,norm --module afni\n')
@@ -148,9 +152,10 @@ print(f'Swarm script written to: {script_path}')
 # # 3. Check all expected datasets were processed
 # To check if jobs run correctly, we check for the presence of one key output. This does not necessarily mean that a job run smoothly to the end, but it is a good way to find jobs that died inadvertently. This will have to be submited again.
 
-# In[12]:
+# In[8]:
 
 
+# Post-run sanity check: verify expected netcc outputs for Basic and GS scenarios.
 num_incomplete_jobs = 0
 for sbj,ses in tqdm(list(ds_index)):
     netcc_path = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'errts.{sbj}.r01.e02.volreg.spc.tproject_ALL_Basic.{ATLAS_NAME}_000.netcc')
@@ -171,9 +176,10 @@ print(f'Number of incomplete jobs: {num_incomplete_jobs}')
 # 
 # ## 4.1 Load Motion information per scan
 
-# In[14]:
+# In[9]:
 
 
+# Build motion table: rows are TRs and columns are (Subject, Session) scans.
 FINAL_N_ACQS = 201
 mot_df = pd.DataFrame(index=np.arange(FINAL_N_ACQS),columns=list(ds_index))
 for sbj,ses in tqdm(list(ds_index)):
@@ -185,7 +191,7 @@ for sbj,ses in tqdm(list(ds_index)):
 # 
 # At this point, only within TE matrices (e.g., TE1_to_TE1, TE2_to_TE2, etc.) are available. No FC across echoes exists yet.
 
-# In[15]:
+# In[10]:
 
 
 import xarray as xr
@@ -194,7 +200,7 @@ import panel as pn
 
 # Load information about the ATLAS: ROI names, hemisphere, etc... This is used when plotting FC matrices
 
-# In[ ]:
+# In[11]:
 
 
 roi_info_df, power264_nw_cmap = get_altas_info(ATLAS_DIR,ATLAS_NAME)
@@ -203,9 +209,10 @@ roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']
 
 # Load the within-echo FC matrices into a single xr.DataArray object
 
-# In[18]:
+# In[12]:
 
 
+# Pre-allocate FC container: censoring mode x scan x NORDIC x ROI x ROI.
 fcs = xr.DataArray(dims=['censor','scan','NORDIC','roi_x','roi_y'], 
                    coords={'censor':['ALL_Basic','ALL_GS'],
                            'scan':['.'.join([sbj,ses]) for sbj,ses in ds_index],
@@ -213,9 +220,10 @@ fcs = xr.DataArray(dims=['censor','scan','NORDIC','roi_x','roi_y'],
                            'roi_x':list(roi_info_df['ROI_Name']),'roi_y':list(roi_info_df['ROI_Name'])})
 
 
-# In[20]:
+# In[13]:
 
 
+# Load each netcc matrix and place it in the corresponding FC DataArray slot.
 for sbj,ses in tqdm(list(ds_index)):
     for scenario in ['ALL_Basic','ALL_GS'] :
         for NORDIC in ['off','on']:
@@ -229,14 +237,16 @@ for sbj,ses in tqdm(list(ds_index)):
 # * Widget to select NORDIC status
 # * Function to plot the resulting FC matrix
 
-# In[21]:
+# In[14]:
 
 
+# Interactive FC viewer: compare Basic vs GS for the selected scan and NORDIC state.
 scan_select   = pn.widgets.Select(name='scan', options=list(fcs.coords['scan'].values))
 NORDIC_select = pn.widgets.Select(name='NORDIC', options=['off','on'])
 @pn.depends(scan_select, NORDIC_select)
 def plot_fc(scan,NORDIC):
     aux = fcs.sel(censor='ALL_Basic',scan=scan, NORDIC=NORDIC).values
+    # Use ROI metadata as index/columns so network-aware plotting works.
     aux = pd.DataFrame(aux,index=roi_info_df.set_index(['ROI_Name','ROI_ID','Hemisphere','Network','RGB']).index, 
                            columns=roi_info_df.set_index(['ROI_Name','ROI_ID','Hemisphere','Network','RGB']).index)
     plot_all = hvplot_fc(aux,major_label_overrides='regular_grid',cmap='RdBu_r', by='Network', add_labels=True, colorbar_position='left', net_cmap=power264_nw_cmap, cbar_title='FC-R (All Acquisitions)')
@@ -248,9 +258,10 @@ def plot_fc(scan,NORDIC):
     return plot_all + plot_kill
 
 
-# In[22]:
+# In[15]:
 
 
+# Companion panel: show the selected scan motion trace (enorm) across TRs.
 @pn.depends(scan_select)
 def plot_mot(scan):
     sbj,ses = scan.split('.')
@@ -260,14 +271,20 @@ def plot_mot(scan):
     return aux_df.hvplot(width=1000,c='k')
 
 
-# In[24]:
+# In[ ]:
 
 
+# Launch dashboard server; close it with `dashboard.stop()` when finished.
 dashboard = pn.Row(pn.Column(scan_select,NORDIC_select),pn.Column(plot_fc,plot_mot)).show()
 
 
-# In[25]:
+# In[17]:
 
 
+# Stop the dashboard server and release resources.
 dashboard.stop()
 
+
+# Here is how the mini-dasboard looks:
+# 
+# ![Dashboard](figures/pBOLD_Dashboard_N03a.png)

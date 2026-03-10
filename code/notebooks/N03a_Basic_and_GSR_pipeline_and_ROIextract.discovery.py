@@ -79,6 +79,7 @@ print(username)
 # In[3]:
 
 
+# Run configuration: choose dataset and atlas folder/name derived from it.
 DATASET    ='discovery'
 ATLAS_NAME = f'Power264-{DATASET}'
 ATLAS_DIR  = osp.join(ATLASES_DIR,ATLAS_NAME)
@@ -89,6 +90,7 @@ ATLAS_DIR  = osp.join(ATLASES_DIR,ATLAS_NAME)
 # In[4]:
 
 
+# `ds_index` is the master list of (Subject, Session) scans used by loops below.
 ds_index = get_dataset_index(DATASET)
 ses_list = list(ds_index.get_level_values('Session').unique())
 sbj_list = list(ds_index.get_level_values('Subject').unique())
@@ -121,6 +123,8 @@ print(log_path)
 # In[7]:
 
 
+# Build a SWARM script with one job per scan and NORDIC mode.
+# Each job runs the Basic/GSR ROI extraction shell script with required env vars.
 with open(script_path, 'w') as the_file:
     the_file.write('# Script Creation Date: %s\n' % str(datetime.date.today()))
     the_file.write(f'# swarm -f {script_path} -g 16 -t 8 -b 2 --time 01:59:00 --logdir {log_path} --partition quick,norm --module afni\n')
@@ -152,6 +156,7 @@ print(f'Swarm script written to: {script_path}')
 # In[8]:
 
 
+# Post-run sanity check: verify expected netcc outputs for Basic and GS scenarios.
 num_incomplete_jobs = 0
 for sbj,ses in list(ds_index):
     netcc_path = osp.join(PRCS_DATA_DIR,sbj,f'D03_Preproc_{ses}_NORDIC-off',f'errts.{sbj}.r01.e02.volreg.spc.tproject_ALL_Basic.{ATLAS_NAME}_000.netcc')
@@ -175,6 +180,7 @@ print(f'Number of incomplete jobs: {num_incomplete_jobs}')
 # In[9]:
 
 
+# Build motion table: rows are TRs and columns are (Subject, Session) scans.
 FINAL_N_ACQS = 192
 mot_df = pd.DataFrame(index=np.arange(FINAL_N_ACQS),columns=list(ds_index))
 for sbj,ses in tqdm(list(ds_index)):
@@ -207,6 +213,7 @@ roi_idxs = roi_info_df.set_index(['ROI_Name', 'ROI_ID', 'Hemisphere', 'Network']
 # In[12]:
 
 
+# Pre-allocate FC container: censoring mode x scan x NORDIC x ROI x ROI.
 fcs = xr.DataArray(dims=['censor','scan','NORDIC','roi_x','roi_y'], 
                    coords={'censor':['ALL_Basic','ALL_GS'],
                            'scan':['.'.join([sbj,ses]) for sbj,ses in ds_index],
@@ -217,6 +224,7 @@ fcs = xr.DataArray(dims=['censor','scan','NORDIC','roi_x','roi_y'],
 # In[13]:
 
 
+# Load each netcc matrix and place it in the corresponding FC DataArray slot.
 for sbj,ses in tqdm(list(ds_index)):
     for scenario in ['ALL_Basic','ALL_GS']:
         for NORDIC in ['off','on']:
@@ -233,11 +241,13 @@ for sbj,ses in tqdm(list(ds_index)):
 # In[14]:
 
 
+# Interactive FC viewer: compare Basic vs GS for the selected scan and NORDIC state.
 scan_select   = pn.widgets.Select(name='scan', options=list(fcs.coords['scan'].values))
 NORDIC_select = pn.widgets.Select(name='NORDIC', options=['off','on'])
 @pn.depends(scan_select, NORDIC_select)
 def plot_fc(scan,NORDIC):
     aux = fcs.sel(censor='ALL_Basic',scan=scan, NORDIC=NORDIC).values
+    # Use ROI metadata as index/columns so network-aware plotting works.
     aux = pd.DataFrame(aux,index=roi_info_df.set_index(['ROI_Name','ROI_ID','Hemisphere','Network','RGB']).index, 
                            columns=roi_info_df.set_index(['ROI_Name','ROI_ID','Hemisphere','Network','RGB']).index)
     plot_basic = hvplot_fc(aux,major_label_overrides='regular_grid',cmap='RdBu_r', by='Network', add_labels=True, colorbar_position='left', net_cmap=power264_nw_cmap, cbar_title='FC-R (All Acquisitions)')
@@ -252,6 +262,7 @@ def plot_fc(scan,NORDIC):
 # In[15]:
 
 
+# Companion panel: show the selected scan motion trace (enorm) across TRs.
 @pn.depends(scan_select)
 def plot_mot(scan):
     sbj,ses = scan.split('.')
@@ -264,11 +275,17 @@ def plot_mot(scan):
 # In[ ]:
 
 
+# Launch dashboard server; close it with `dashboard.stop()` when finished.
 dashboard = pn.Row(pn.Column(scan_select,NORDIC_select),pn.Column(plot_fc,plot_mot)).show()
 
 
 # In[17]:
 
 
+# Stop the dashboard server and release resources.
 dashboard.stop()
 
+
+# Here is how the dashboard looks:
+# 
+# ![Dashboard](figures/pBOLD_Dashboard_N03a.png)

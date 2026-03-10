@@ -177,9 +177,7 @@ panel_a = (scat_datashaded * nonBOLD_line * BOLD_line * data_line * zero_point).
 
 
 from statsmodels.stats.diagnostic import het_breuschpagan
-from statsmodels.formula.api import ols
 import statsmodels.api as sm
-import statsmodels.stats.diagnostic as diag
 
 X = a
 # Add a constant for the intercept
@@ -224,7 +222,7 @@ panel_b = (scatter * smooth_curve * zero_line).opts(
     xlabel='Fitted values', ylabel='Residuals')
 
 
-# In[31]:
+# In[17]:
 
 
 bold_banner = pn.pane.HTML(
@@ -247,7 +245,7 @@ bold_banner = pn.pane.HTML(
 )
 
 
-# In[33]:
+# In[18]:
 
 
 SuppFig01 = pn.Column(bold_banner, pn.Row(panel_a,panel_b))

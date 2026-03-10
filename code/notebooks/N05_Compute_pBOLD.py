@@ -11,31 +11,24 @@
 # 
 # The last cell allows to identify potential jobs that might have failed.
 
-# In[12]:
+# In[1]:
 
 
 import os.path as osp
 import os
-import pandas as pd
-import xarray as xr
-import numpy as np
-from tqdm import tqdm
-import pickle
-import panel as pn
-from nilearn.connectome import sym_matrix_to_vec
 from utils.basics import get_dataset_index
 from utils.basics import PRJ_DIR, ATLASES_DIR, CODE_DIR, TES_MSEC
 import datetime
 
 
-# In[13]:
+# In[2]:
 
 
 CENSORING_MODE='ALL'
 DATASET = input ('Select Dataset (discovery or evaluation):')
 
 
-# In[14]:
+# In[3]:
 
 
 ATLAS_NAME = f'Power264-{DATASET}'
@@ -46,7 +39,7 @@ echo_times_dict = TES_MSEC[DATASET]
 
 # Get username. We use this to create user specific locations for SWARM and log files.
 
-# In[15]:
+# In[4]:
 
 
 import getpass
@@ -56,7 +49,7 @@ print(username)
 
 # Get list of scans in the dataset
 
-# In[16]:
+# In[5]:
 
 
 ds_index = get_dataset_index(DATASET)
@@ -64,21 +57,11 @@ ses_list = list(ds_index.get_level_values('Session').unique())
 sbj_list = list(ds_index.get_level_values('Subject').unique())
 
 
-# Get username. We use this to create user specific locations for SWARM and log files.
-
-# In[17]:
-
-
-import getpass
-username = getpass.getuser()
-print(username)
-
-
 # # 2. Create Swarm Script to Extract ROI TS from Basic denoised data
 # 
 # Create path to SWARM script
 
-# In[18]:
+# In[7]:
 
 
 script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N05_Compute_pBOLD.{DATASET}.{ATLAS_NAME}.SWARM.sh')
@@ -87,7 +70,7 @@ print(script_path)
 
 # Create folder for logs created by the batch jobs
 
-# In[19]:
+# In[8]:
 
 
 log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N05_Compute_pBOLD.{DATASET}.{ATLAS_NAME}.log')
@@ -98,13 +81,13 @@ print(log_path)
 
 # Create the SWARM script. This script will have one line per scan
 
-# In[20]:
+# In[9]:
 
 
 echo_times_in_msec = ','.join([str(te) for _,te in echo_times_dict.items()])
 
 
-# In[21]:
+# In[10]:
 
 
 with open(script_path, 'w') as the_file:
@@ -140,10 +123,4 @@ for sbj,ses in list(ds_index):
                 if not osp.exists(out_path):
                     missing_outputs.append(out_path)
 print(" Missing %d files of %d needed" %(len(missing_outputs), len(needed_outputs)))
-
-
-# In[ ]:
-
-
-
 

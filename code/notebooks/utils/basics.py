@@ -287,3 +287,20 @@ def read_gen_ss_review_table(file_path):
             df[c] = df[c]
     print("++ INFO [read_gen_ss_review_table]: Number of scans = %d | Number of metrics per scan = %d" % (df.shape))
     return df
+
+# plotting related functions
+# ==========================
+def calculate_mean_deviation(data):
+    """
+    Calculates the mean absolute deviation (MAD) of a dataset.
+
+    Args:
+        data (list or numpy.ndarray): The input dataset.
+
+    Returns:
+        float: The mean absolute deviation of the data.
+    """
+    mean_value = np.mean(data)
+    absolute_deviations = [abs(x - mean_value) for x in data]
+    mean_deviation = np.mean(absolute_deviations)
+    return mean_deviation

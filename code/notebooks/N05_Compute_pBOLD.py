@@ -11,7 +11,7 @@
 # 
 # The last cell allows to identify potential jobs that might have failed.
 
-# In[1]:
+# In[13]:
 
 
 import os.path as osp
@@ -19,6 +19,7 @@ import os
 from utils.basics import get_dataset_index
 from utils.basics import PRJ_DIR, ATLASES_DIR, CODE_DIR, TES_MSEC
 import datetime
+from tqdm.notebook import tqdm
 
 
 # In[2]:
@@ -61,7 +62,7 @@ sbj_list = list(ds_index.get_level_values('Subject').unique())
 # 
 # Create path to SWARM script
 
-# In[7]:
+# In[6]:
 
 
 script_path = osp.join(PRJ_DIR,f'swarm.{username}',f'N05_Compute_pBOLD.{DATASET}.{ATLAS_NAME}.SWARM.sh')
@@ -70,7 +71,7 @@ print(script_path)
 
 # Create folder for logs created by the batch jobs
 
-# In[8]:
+# In[7]:
 
 
 log_path = osp.join(PRJ_DIR,f'logs.{username}',f'N05_Compute_pBOLD.{DATASET}.{ATLAS_NAME}.log')
@@ -81,13 +82,13 @@ print(log_path)
 
 # Create the SWARM script. This script will have one line per scan
 
-# In[9]:
+# In[8]:
 
 
 echo_times_in_msec = ','.join([str(te) for _,te in echo_times_dict.items()])
 
 
-# In[10]:
+# In[9]:
 
 
 with open(script_path, 'w') as the_file:
@@ -109,12 +110,12 @@ print(f'Swarm script written to: {script_path}')
 
 # # 3. Check all outputs were created
 
-# In[11]:
+# In[15]:
 
 
 needed_outputs = []
 missing_outputs = []
-for sbj,ses in list(ds_index):
+for sbj,ses in tqdm(list(ds_index)):
     for NORDIC in ['on','off']:
         for fc_metric in ['corr','cov']:
             for pp in ['ALL_NoRegression','ALL_Basic','ALL_GS','ALL_Tedana-fastica']:

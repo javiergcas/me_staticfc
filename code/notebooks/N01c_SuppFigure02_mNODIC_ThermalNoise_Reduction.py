@@ -4,6 +4,12 @@
 # import panel as pn
 # pn.extension()
 
+# # Description: Generate Supplementary Figure 02
+# 
+# This notebook takes the outputs from N01a and N02b, adds headers and creates the final version of Supp. Figure 02.
+# 
+# ## Create Top Banners
+
 # In[36]:
 
 
@@ -45,6 +51,8 @@ top_banner_b = pn.pane.HTML(
     sizing_mode="scale_width",
 )
 
+
+# ## Compose Final Figure Layout
 
 # In[38]:
 

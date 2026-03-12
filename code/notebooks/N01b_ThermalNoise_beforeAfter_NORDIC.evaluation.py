@@ -15,7 +15,7 @@
 # * Thermal noise should be TE independent, yet becuase the suboptimal way in which we are measuring thermal noise, a slight difference migth occur.
 # * Thermal noise should be significantly smaller after NORDIC for all echoes.
 
-# In[3]:
+# In[8]:
 
 
 import pandas as pd
@@ -30,11 +30,25 @@ import matplotlib.pyplot as plt
 
 from utils.basics import get_dataset_index
 
+def set_fontsizes(fig, size=14):
+    for ax in fig.axes:
+        ax.title.set_fontsize(size)
+        ax.xaxis.label.set_size(size)
+        ax.yaxis.label.set_size(size)
+        ax.tick_params(labelsize=size - 1)
+
+        leg = ax.get_legend()
+        if leg is not None:
+            for t in leg.get_texts():
+                t.set_fontsize(size - 1)
+            if leg.get_title() is not None:
+                leg.get_title().set_fontsize(size)
+
 
 # 
 # ### Load list of scans from the Evaluation dataset entering the final set of analyses
 
-# In[4]:
+# In[2]:
 
 
 DATASET = 'evaluation'
@@ -46,7 +60,7 @@ dataset_info_df = pd.DataFrame(index=pd.MultiIndex.from_product([sbj_list,ses_li
 
 # ### Load the Thermmal noise estiamtes for these scans
 
-# In[5]:
+# In[3]:
 
 
 df_list = []
@@ -63,7 +77,7 @@ df = pd.DataFrame(df_list)
 
 # ### Separate the data by session ID
 
-# In[6]:
+# In[4]:
 
 
 df_ses1 = df.set_index('Session').loc['ses-1'].copy().reset_index(drop=True)
@@ -72,7 +86,7 @@ df_ses2  = df.set_index('Session').loc['ses-2'].copy().reset_index(drop=True)
 
 # ### Print the overall improvement in Thermal Noise for the whole dataset
 
-# In[7]:
+# In[5]:
 
 
 aux = (100 * (df.set_index(['Subject','Session','m-NORDIC','Echo']).loc[:,:,'off',:] - df.set_index(['Subject','Session','m-NORDIC','Echo']).loc[:,:,'on',:]) / df.set_index(['Subject','Session','m-NORDIC','Echo']).loc[:,:,'off',:]).describe()
@@ -81,7 +95,7 @@ print('Thermal Noise reduction after m-NORDIC (%%): %0.2f +/- %0.2f' % (aux.loc[
 
 # ### Generate Suppl. Figure 2.b panel
 
-# In[8]:
+# In[9]:
 
 
 fig, axs = plt.subplots(1,2,figsize=(14,7))
@@ -102,10 +116,18 @@ annotation = Annotator(axs[1], pairs, data=df_ses2, hue='m-NORDIC', y='Thermal N
 annotation.configure(test='t-test_paired', loc='inside', verbose=0, comparisons_correction="Bonferroni");
 annotation.apply_test(alternative='two-sided');
 annotation.annotate();
+set_fontsizes(fig, size=16);
 
 
-# In[9]:
+# In[10]:
 
 
-fig.savefig('./figures/pBOLD_Supp02_b.png')
+fig.tight_layout()
+fig.savefig('./figures/pBOLD_SuppFig02_b.png', bbox_inches="tight", pad_inches=0)
+
+
+# In[ ]:
+
+
+
 

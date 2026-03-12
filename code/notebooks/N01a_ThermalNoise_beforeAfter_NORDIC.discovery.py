@@ -15,7 +15,7 @@
 # * Thermal noise should be TE independent, yet becuase the suboptimal way in which we are measuring thermal noise, a slight difference migth occur.
 # * Thermal noise should be significantly smaller after m-NORDIC for all echoes.
 
-# In[1]:
+# In[9]:
 
 
 import pandas as pd
@@ -28,6 +28,20 @@ from statannotations.Annotator import Annotator
 import matplotlib.pyplot as plt
 
 from utils.basics import get_dataset_index
+
+def set_fontsizes(fig, size=14):
+    for ax in fig.axes:
+        ax.title.set_fontsize(size)
+        ax.xaxis.label.set_size(size)
+        ax.yaxis.label.set_size(size)
+        ax.tick_params(labelsize=size - 1)
+
+        leg = ax.get_legend()
+        if leg is not None:
+            for t in leg.get_texts():
+                t.set_fontsize(size - 1)
+            if leg.get_title() is not None:
+                leg.get_title().set_fontsize(size)
 
 
 # 
@@ -71,7 +85,7 @@ df_CardG  = df.set_index('Session').loc['cardiac_gated'].copy().reset_index(drop
 
 # ### The next cell computes the mean and stdev of the reduction in thermal noise. We report these values in the manuscript
 
-# In[8]:
+# In[5]:
 
 
 aux = (100 * (df.set_index(['Subject','Session','m-NORDIC','Echo']).loc[:,:,'off',:] - df.set_index(['Subject','Session','m-NORDIC','Echo']).loc[:,:,'on',:]) / df.set_index(['Subject','Session','m-NORDIC','Echo']).loc[:,:,'off',:]).describe()
@@ -101,10 +115,18 @@ annotation = Annotator(axs[1], pairs, data=df_CardG, hue='m-NORDIC', y='Thermal 
 annotation.configure(test='t-test_paired', loc='inside', verbose=0, comparisons_correction="Bonferroni");
 annotation.apply_test(alternative='two-sided');
 annotation.annotate();
+set_fontsizes(fig, size=16);
 
 
 # In[12]:
 
 
-fig.savefig('./figures/pBOLD_Supp02_a.png')
+fig.tight_layout()
+fig.savefig('./figures/pBOLD_SuppFig02_a.png', bbox_inches="tight", pad_inches=0)
+
+
+# In[ ]:
+
+
+
 

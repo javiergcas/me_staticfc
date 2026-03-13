@@ -5,7 +5,7 @@
 # 
 # This notebook can be used to generate Figure 02 in the accompanying publication. This figure contains information about how pBOLD is computed given a multi-echo dataset.
 
-# In[1]:
+# In[ ]:
 
 
 import pandas as pd
@@ -17,7 +17,6 @@ from utils.basics import get_altas_info
 from utils.fc_matrices import hvplot_fc
 import matplotlib.colors as mcolors
 
-#from sfim_lib.plotting.fc_matrices import hvplot_fc
 ATLAS_NAME = 'Power264-discovery'
 ATLAS_DIR = osp.join(ATLASES_DIR,ATLAS_NAME)
 import panel as pn

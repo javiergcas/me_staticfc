@@ -86,7 +86,7 @@ ses = 'ses-1'
 
 # Grab all the relevant AFNI snapshots needed for the left most column of the figure.
 
-# In[ ]:
+# In[6]:
 
 
 mean_ax_path = f'./figures/pBOLD_SuppFig04_{left_panel_sbj}_{ses}_mean.axi.png'
@@ -108,7 +108,7 @@ basic_sbco_cr_path = f'./figures/pBOLD_SuppFig04_{left_panel_sbj}_{ses}_basic_re
 style_1 = {'font-family':'sans-serif','font-size':'22px', 'writing-mode':'vertical-lr', 'text-orientation':'sideways', 'transform':'rotate(180deg)','text-align':'center'}
 
 
-# In[28]:
+# In[7]:
 
 
 left_top_header = pn.pane.HTML("<div style='font-family: sans-serif; font-size: 22px;'>Example Scan 1 | 38% Thermal Noise Reduction</div>", width=700, styles={'text-align': 'center'})
@@ -126,14 +126,14 @@ d_left = pn.Row(panel_id_d,pn.pane.PNG(basic_sbco_ax_path, height=200),pn.pane.P
 # ***
 # # Generate Right Side of Figure
 
-# In[29]:
+# In[8]:
 
 
 right_panel_sbj = 'sub-16'
 ses = 'ses-1'
 
 
-# In[30]:
+# In[9]:
 
 
 mean_ax_path = f'./figures/pBOLD_SuppFig04_{right_panel_sbj}_{ses}_mean.axi.png'
@@ -153,7 +153,7 @@ basic_sbco_sg_path = f'./figures/pBOLD_SuppFig04_{right_panel_sbj}_{ses}_basic_r
 basic_sbco_cr_path = f'./figures/pBOLD_SuppFig04_{right_panel_sbj}_{ses}_basic_reg_sbco.cor.png'
 
 
-# In[31]:
+# In[10]:
 
 
 right_top_header = pn.pane.HTML("<div style='font-family: sans-serif; font-size: 22px;'>Example Scan 2 | 34% Thermal Noise Reduction</div>", width=700, styles={'text-align': 'center'})
@@ -167,8 +167,12 @@ d_right = pn.Row(pn.pane.PNG(basic_sbco_ax_path, height=200),pn.pane.PNG(basic_s
 # ***
 # # Combine all elements
 
-# pn.Row(pn.Column(left_top_header,a_left,b_left,c_left, d_left),
-# pn.Column(right_top_header,a_right,b_right,c_right, d_right)).save('./figures/pBOLD_SuppFig04.html')
+# In[12]:
+
+
+pn.Row(pn.Column(left_top_header,a_left,b_left,c_left, d_left),
+pn.Column(right_top_header,a_right,b_right,c_right, d_right)).save('./figures/pBOLD_SuppFig04.html')
+
 
 # Here is the figure
 # 

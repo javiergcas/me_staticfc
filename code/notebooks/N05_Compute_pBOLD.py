@@ -11,13 +11,13 @@
 # 
 # The last cell allows to identify potential jobs that might have failed.
 
-# In[13]:
+# In[1]:
 
 
 import os.path as osp
 import os
 from utils.basics import get_dataset_index
-from utils.basics import PRJ_DIR, ATLASES_DIR, CODE_DIR, TES_MSEC
+from utils.basics import PRJ_DIR, ATLASES_DIR, CODE_DIR, TES_MSEC, PIPELINES
 import datetime
 from tqdm.notebook import tqdm
 
@@ -25,7 +25,6 @@ from tqdm.notebook import tqdm
 # In[2]:
 
 
-CENSORING_MODE='ALL'
 DATASET = input ('Select Dataset (discovery or evaluation):')
 
 
@@ -98,7 +97,7 @@ with open(script_path, 'w') as the_file:
     for sbj,ses in list(ds_index):
         for NORDIC in ['on','off']:
             for fc_metric in ['corr','cov']:
-                for pp in ['ALL_NoRegression','ALL_Basic','ALL_GS','ALL_Tedana-fastica']:
+                for pp in PIPELINES:
                     e01_ts_path = osp.join(PRJ_DIR,'prcs_data',sbj,f'D03_Preproc_{ses}_NORDIC-{NORDIC}',f'errts.{sbj}.r01.e01.volreg.spc.tproject_{pp}.{ATLAS_NAME}_000.netts')
                     e02_ts_path = osp.join(PRJ_DIR,'prcs_data',sbj,f'D03_Preproc_{ses}_NORDIC-{NORDIC}',f'errts.{sbj}.r01.e02.volreg.spc.tproject_{pp}.{ATLAS_NAME}_000.netts')
                     e03_ts_path = osp.join(PRJ_DIR,'prcs_data',sbj,f'D03_Preproc_{ses}_NORDIC-{NORDIC}',f'errts.{sbj}.r01.e03.volreg.spc.tproject_{pp}.{ATLAS_NAME}_000.netts')
@@ -110,7 +109,7 @@ print(f'Swarm script written to: {script_path}')
 
 # # 3. Check all outputs were created
 
-# In[15]:
+# In[10]:
 
 
 needed_outputs = []
@@ -118,10 +117,16 @@ missing_outputs = []
 for sbj,ses in tqdm(list(ds_index)):
     for NORDIC in ['on','off']:
         for fc_metric in ['corr','cov']:
-            for pp in ['ALL_NoRegression','ALL_Basic','ALL_GS','ALL_Tedana-fastica']:
+            for pp in PIPELINES:
                 out_path    = osp.join(PRJ_DIR,'prcs_data',sbj,f'D03_Preproc_{ses}_NORDIC-{NORDIC}',f'errts.{sbj}.r01.volreg.spc.tproject_{pp}.{ATLAS_NAME}_000.pBOLD_{fc_metric}.csv')
                 needed_outputs.append(out_path)
                 if not osp.exists(out_path):
                     missing_outputs.append(out_path)
 print(" Missing %d files of %d needed" %(len(missing_outputs), len(needed_outputs)))
+
+
+# In[ ]:
+
+
+
 

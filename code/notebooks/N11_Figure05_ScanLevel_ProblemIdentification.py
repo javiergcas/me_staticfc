@@ -482,14 +482,14 @@ for panel_idx in tqdm(panel_info.keys()):
 # Create FC matrix visualizations for each selected scan using atlas/network styling and store them for layout composition.
 # 
 
-# In[55]:
+# In[ ]:
 
 
 hv.extension('bokeh')
 FCmats_dict = {}
 for panel_idx in tqdm(panel_info.keys()):
     (sbj,ses)    = panel_info[panel_idx]['scan']
-    this_fc      = data_fc[sbj,ses,'ALL_Basic','off','e02|e02','R']
+    this_fc      = data_fc[sbj,ses,'ALL_Basic','off','e02|e02','corr']
     this_fc_plot = hvplot_fc(this_fc,
                              major_label_overrides='regular_grid', 
                              net_cmap=power264_nw_cmap,

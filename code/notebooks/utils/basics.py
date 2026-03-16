@@ -37,9 +37,12 @@ echo_pairs_tuples   = [i for i in combinations_with_replacement(['e01','e02','e0
 echo_pairs          = [('|').join(i) for i in echo_pairs_tuples]
 pairs_of_echo_pairs = ['|'.join((e_x[0],e_x[1]))+'_vs_'+'|'.join((e_y[0],e_y[1])) for e_x,e_y in combinations(echo_pairs_tuples,2)]
 
-LABEL_MAPPING = {'ALL_Basic':'Basic','ALL_GS':'GSR','ALL_Tedana-fastica':'Tedana','ALL_NoRegression':'No Regression',
-                 'KILL_Basic':'Basic w/ censoring','KILL_GS':'GSR w/ censoring','KILL_Tedana-fastica':'Tedana w/censoring','KILL_NoRegression':'No Regression w/censoring',
-                 'NORDIC':'on'}
+PIPELINES = ['ALL_NoRegression','ALL_Basic','ALL_GS','ALL_Tedana-fastica']
+LABEL_MAPPING = {'ALL_Basic':'Basic',
+                 'ALL_GS':'GSR',
+                 'ALL_Tedana-fastica':'Tedana',
+                 'ALL_NoRegression':'No Regression',
+                 'm-NORDIC':'on'}
 
 # Colormap for networks associated with the Power 264 atlas
 # =========================================================

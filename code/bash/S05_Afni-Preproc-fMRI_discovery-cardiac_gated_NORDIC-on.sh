@@ -44,7 +44,6 @@ for sbj_path in ${subjects[@]}
 do
     SBJ=`basename ${sbj_path}`
     ANAT_PROC_DIR=`echo ${PRJDIR}/prcs_data/${SBJ}/D01_Anatomical`
-    FMRI_ORIG_DIR=`echo ${DOWNLOAD_DATA}/${SBJ}/${SES}/func`
     OUT_DIR=`echo ${PRJDIR}/prcs_data/${SBJ}/D03_Preproc_${SES}_NORDIC-on`
     AFNI_PROC_OUT_SCRIPT=`echo ${AFNI_PROC_OUT_DIR}/S05_Afni-Preproc-fMRI_discovery_${SBJ}-${SES}_NORDIC-on.sh`
     AFNI_PROC_OUT_LOGFILE=`echo ${AFNI_PROC_OUT_DIR}/output.S05_Afni-Preproc-fMRI_discovery_${SBJ}-${SES}_NORDIC-on.txt`

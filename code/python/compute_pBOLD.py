@@ -91,9 +91,9 @@ def process_command_line():
                         help="Functional connectivity metric to use: covariance ('cov') or correlation ('corr')")
     parser.add_argument("-o", "--output", action="store", type=str, required=True, dest="output_path", default=None,
                         help="Output path for the pBOLD results")
-    parser.add_argument("-t", "--line_pref_tolerance", action="store_true", required=False, dest="line_pref_tolerance", default=1e-3,
+    parser.add_argument("-t", "--line_pref_tolerance", required=False, dest="line_pref_tolerance", default=1e-3,
                         help="Tolerance for considering points as ties when computing line preference")
-    parser.add_argument("-mrq", "--max_radius_quantile", action="store_true", required=False, dest="max_radius_quantile", default=0.95,
+    parser.add_argument("-mrq", "--max_radius_quantile", required=False, dest="max_radius_quantile", default=0.95,
                         help="Maximum radius (in quantile terms) to apply when computing weighted preferences")
     return parser.parse_args()
 

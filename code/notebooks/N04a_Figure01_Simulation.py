@@ -447,11 +447,12 @@ bold_banner = pn.pane.HTML(
 # ***
 # # 3. Compose Final Figure
 
-# In[28]:
+# In[ ]:
 
 
 figure01 = pn.Row(pn.Column(non_bold_banner,pn.Row(non_bold_sim_panel,non_bold_real_panel), width=1000),
        pn.Column(bold_banner,    pn.Row(bold_sim_panel,bold_real_panel), width=1000))
+figure01.save('./figures/pBOLD_Figure01.html')
 
 
 # Here is the figure!!!

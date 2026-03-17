@@ -16,7 +16,6 @@ LOGS_DIR=`echo ${PRJDIR}/logs.${USERNAME}/S04_Afni-Preproc-fMRI_discovery-${SES}
 subjects=(`find ${SUBJECTS_DIR} -name "MGSBJ*" -type d | tr -s '\n' ' '`)
 num_subjects=`echo ${#subjects[@]}`
 echo "++ Orig Data Folder  : ${PRCSDATA_DIR}"
-echo "++ Scripts Folder    : ${SCRIPTS_PATH}"
 echo "++ Swarm Folder      : ${SWARM_PATH}"
 echo "++ Logs Folder       : ${LOGS_DIR}"
 echo "++ Freesurfer Folder : ${SUBJECTS_DIR}"

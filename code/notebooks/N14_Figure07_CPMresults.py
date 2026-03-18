@@ -299,7 +299,7 @@ for TRAINING_SES in tqdm(['ses-1','ses-2'],desc='Session'):
 
 # Create scatter plots of predicted vs. observed behavior for the three pre-processing pipelines with m-NORDIC off
 
-# In[12]:
+# In[ ]:
 
 
 # Select scenario used to generate panels (f), (g), and (h).
@@ -346,7 +346,7 @@ for i, pp in zip(['f','g','h'],['ALL_Basic','ALL_GS','ALL_Tedana-fastica']):
 
     # Save to disk
     # After all plotting code (and before/without plt.show())
-    out_png = f"./figures/pBOLD_Figure05_{i}.png"
+    out_png = f"./figures/pBOLD_Figure07_{i}.png"
 
     plt.savefig( out_png, dpi=150, bbox_inches="tight", pad_inches=0.05)
 

@@ -8,4 +8,4 @@ Two ways in which this code might be useful:
 
 2) To compute pBOLD on your own data. For this, you can use the standalone program [compute_pBOLD.py](./code/python/compute_pBOLD.py) contained in this repo.
 
-[Figure 2](./code/notebooks/figures/pBOLD_Figure02.png)
+![Figure 2](./code/notebooks/figures/pBOLD_Figure02.png)

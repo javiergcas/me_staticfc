@@ -53,7 +53,7 @@ sbj_list = list(ds_index.get_level_values('Subject').unique())
 # The next cells load GS kappa/rho estimates, real adjusted R^2 estimates, and the null adjusted R^2 distribution. They also compute scan-level motion summaries (mean/max ENORM) and scaled marker-size columns for panel (a).
 # 
 
-# In[7]:
+# In[4]:
 
 
 gs_kappa_rho_path = f'./summary_files/{DATASET}_gs_kappa_rho.csv'
@@ -65,7 +65,7 @@ gs_kappa_rho_df.head(3)
 
 # # 1.4. Load Variance Explained in the Global Signal by Physiological Regressors
 
-# In[8]:
+# In[5]:
 
 
 real_varex_path = f'./summary_files/{DATASET}_varexp_gs_physio.real_data.csv'
@@ -77,7 +77,7 @@ real_varex_df.head(3)
 
 # ## 1.5. Load a null distribution for the variance explained in the GS
 
-# In[9]:
+# In[6]:
 
 
 null_varex_path = f'./summary_files/{DATASET}_varexp_gs_physio.null_distribution.csv'
@@ -89,7 +89,7 @@ null_varex_df.head(3)
 
 # ## 1.6. Load Head Motion Estimates
 
-# In[10]:
+# In[7]:
 
 
 mms = MinMaxScaler(feature_range=(2, 100))
@@ -113,7 +113,7 @@ print (motion_df.shape)
 # 
 # Concatenate GS kappa/rho values with motion metrics so each row corresponds to one scan with all variables needed for visualization.
 
-# In[11]:
+# In[8]:
 
 
 df = pd.concat([gs_kappa_rho_df, motion_df], axis=1)
@@ -125,7 +125,7 @@ df.head(3)
 # 
 # Construct a Seaborn JointGrid scatter of `kappa (GS)` vs `rho (GS)`, add diagonal reference regions, marginal distributions, and a motion colorbar, then save panel (a) as `./figures/pBOLD_Figure06_a.png`.
 
-# In[12]:
+# In[9]:
 
 
 # Set seaborn theme
@@ -216,7 +216,7 @@ print(f"Saved: {out_png}")
 # 
 # Compute the non-parametric `p=0.05` cutoff as the 95th percentile of the null adjusted R^2 distribution.
 
-# In[14]:
+# In[10]:
 
 
 non_parametric_p005 = null_varex_df.quantile(0.95).values[0]
@@ -231,7 +231,7 @@ print('++ INFO: Non-parametric value for p=0.05 --> %.2f' % non_parametric_p005)
 # The hook function in the next cell is used for the horizontal annotation.
 # 
 
-# In[15]:
+# In[11]:
 
 
 x0, x1 = non_parametric_p005, 1.0
@@ -260,13 +260,13 @@ def add_span_label(plot, element):
     )
 
 
-# In[16]:
+# In[13]:
 
 
 hv.extension('matplotlib')
 panel_b = (hv.VSpan(non_parametric_p005,1.0).opts(facecolor='lightgray', color='gray') * \
-real_varex_df.hvplot.hist(bins=20, xlim=(0,1),                     ylabel=' % Scans', xlabel=r"$Adjusted R^{2}$",normed=True, label='Real Data', legend=False, fontscale=1.5, facecolor='gray') * \
-real_varex_df.hvplot.kde(          xlim=(0,1),                     ylabel=' % Scans',              label='Real Data', legend=False, facecolor='gray'))
+real_varex_df.hvplot.hist(bins=20, xlim=(0,1),                     ylabel=' % Scans', xlabel=r"$Adjusted R^{2}$",normed=True, label='Real Data', legend=False, fontscale=1.5, facecolor='gray')) #* \
+#real_varex_df.hvplot.kde(          xlim=(0,1),                     ylabel=' % Scans',              label='Real Data', legend=False, facecolor='gray'))
 panel_b = panel_b.opts(hooks=[add_span_label])
 
 
@@ -276,7 +276,7 @@ panel_b = panel_b.opts(hooks=[add_span_label])
 # Combine panel (a) PNG and panel (b) HoloViews output into one Panel column, add `(a)`/`(b)` labels, and save the final figure as `./figures/pBOLD_Figure06.html`.
 # 
 
-# In[17]:
+# In[14]:
 
 
 pn.Column( pn.Row(pn.pane.Markdown('## (a)'), width=10),

@@ -1,17 +1,9 @@
 # Description
 
-This is an ogoing project looking to derive new QA metrics for multi-echo fMRI data. In particular, it focused on exploiting some theoretical expectations about how functional connectivity should vary across echoes when data is dominated by different noise sources (e.g., net magnetization fluctuations, BOLD fluctuations, etc.).
+This repo contains the code accompanying the publication titled "A new fMRI quality metric using multi-echo information: Theory, validation and implications". The work defines and empirically validates a new quality assurance metric for multi-echo fMRI called pBOLD.
 
-# Preliminary results
+Two ways in which this code might be useful:
 
-Most notebooks in this project generate dynamic figures using holoviz libraries. These figures are intended to summarize key observations.
+1) To reproduce results and figures in the manuscript. Please check information in the accompanying [wiki] (../../wiki) for details intrustions about how the code is organized and the order in which to run it.
 
-Below you can find links to these figures so you can explore them at your own pace.
-
-1. [Theoretical Behavior for Correlation based FC when computed across different echo time pairs](https://javiergcas.github.io/me_staticfc/results/FCR_theoretical_behavior_across_echoes.html')
-
-2. [Correlation based results for Basic and Tedana pre-processing pipelines](https://javiergcas.github.io/me_staticfc/results/Basic_2_MEICA.jpeg.html)
-
-3. [Correlation based FC vs. Frame-wise Displacement](https://javiergcas.github.io/me_staticfc/results/Corr_vs_Motion.html)
-
-4. [Covariance based FC vs. Frame-wise Displacement](https://javiergcas.github.io/me_staticfc/results/Cov_vs_Motion.html)
+2) To compute pBOLD on your own data. For this, you can use the standalone program [compute_pBOLD.py](./code/python/compute_pBOLD.py) contained in this repo.

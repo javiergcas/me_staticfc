@@ -1,6 +1,6 @@
 # Description
 
-This repo contains the code accompanying the publication titled **"A new fMRI quality metric using multi-echo information: Theory, validation and implications"**. The work defines and empirically validates a new quality assurance metric for multi-echo fMRI called pBOLD.
+This repo contains the code accompanying the publication titled **"A new fMRI quality metric using multi-echo information: Theory, validation and implications"** (now available as a pre-print [here](https://www.biorxiv.org/content/10.64898/2026.03.19.712948v1)). The work defines and empirically validates a new quality assurance metric for multi-echo fMRI called pBOLD.
 
 Two ways in which this code might be useful:
 
